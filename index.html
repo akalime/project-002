@@ -259,33 +259,246 @@ input:focus {
 /* ===== SETUP SCREEN ===== */
 #setupScreen {
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 28px;
-  padding: 40px;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 0;
   overflow-y: auto;
 }
 
-.setup-header {
-  text-align: center;
+.setup-hero {
+  padding: 40px 24px 32px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 
-.setup-title {
+.setup-hero-title {
   font-family: 'Bebas Neue', 'Arial Black', 'Impact', sans-serif;
-  font-size: 42px;
-  letter-spacing: 4px;
+  font-size: 48px;
+  letter-spacing: 6px;
   color: var(--text);
+  line-height: 1;
 }
 
-.setup-title span { color: var(--accent); }
+.setup-hero-title span { color: var(--accent); text-shadow: 0 0 20px var(--accent-glow); }
 
-.setup-sub {
+.setup-hero-sub {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   color: var(--text-muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
   margin-top: 6px;
 }
 
+.setup-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.setup-status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+.module-picker {
+  padding: 24px;
+  flex-shrink: 0;
+}
+
+.module-picker-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+}
+
+.module-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.module-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.module-item:hover:not(.locked) {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.module-item.locked {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.module-item-num {
+  font-family: 'Bebas Neue', 'Arial Black', sans-serif;
+  font-size: 28px;
+  color: var(--accent);
+  letter-spacing: 1px;
+  line-height: 1;
+  min-width: 36px;
+}
+
+.module-item.locked .module-item-num { color: var(--text-muted); }
+
+.module-item-info { flex: 1; }
+
+.module-item-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.module-item-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.module-item-arrow {
+  font-size: 16px;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.module-item:hover:not(.locked) .module-item-arrow {
+  color: var(--accent);
+  transform: translateX(4px);
+}
+
+.section-picker {
+  padding: 24px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.section-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.section-picker-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+}
+
+.section-back-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: color 0.2s;
+}
+
+.section-back-btn:hover { color: var(--accent); }
+
+.section-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.section-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.section-item:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.section-item.selected {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.section-item-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  min-width: 24px;
+}
+
+.section-item-title {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.section-item-flag {
+  font-size: 12px;
+}
+
+.setup-launch {
+  padding: 20px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.launch-info {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.btn-launch {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  padding: 16px 24px;
+  border-radius: 8px;
+  font-family: 'Bebas Neue', 'Arial Black', sans-serif;
+  font-size: 18px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.btn-launch:hover { filter: brightness(1.1); box-shadow: 0 4px 20px var(--accent-glow); }
+.btn-launch:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+/* Keep old setup-card for any remaining uses */
 .setup-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -886,7 +1099,184 @@ hr { border: none; border-top: 1px solid var(--border); }
 
 /* Scrollbar global */
 ::-webkit-scrollbar { width: 4px; }
-/* ===== MOBILE ===== */
+/* ===== CLI BOTTOM SHEET ===== */
+.cli-sheet {
+  position: fixed;
+  bottom: -100%;
+  left: 0;
+  right: 0;
+  height: 65vh;
+  background: var(--code-bg);
+  border-top: 1px solid var(--accent);
+  border-radius: 16px 16px 0 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  transition: bottom 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 -8px 40px rgba(0,229,160,0.15);
+}
+
+.cli-sheet.open { bottom: 0; }
+
+.cli-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--border2);
+  border-radius: 2px;
+  margin: 10px auto 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cli-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.cli-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cli-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+
+.cli-dot:nth-child(1) { background: #ff5f57; }
+.cli-dot:nth-child(2) { background: #febc2e; }
+.cli-dot:nth-child(3) { background: #28c840; }
+
+.cli-title-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-left: 8px;
+}
+
+.cli-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.cli-clear-btn, .cli-close-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text-muted);
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cli-clear-btn:hover { border-color: var(--warn); color: var(--warn); }
+.cli-close-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+.cli-output {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.cli-output::-webkit-scrollbar { width: 3px; }
+.cli-output::-webkit-scrollbar-thumb { background: var(--border2); }
+
+.cli-line { margin-bottom: 2px; }
+.cli-line.cli-system { color: var(--text-muted); }
+.cli-line.cli-input-echo { color: var(--accent); }
+.cli-line.cli-output-text { color: var(--text); white-space: pre-wrap; }
+.cli-line.cli-error { color: var(--danger); }
+.cli-line.cli-spacer { height: 6px; }
+
+.cli-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.cli-prompt {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.cli-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  outline: none;
+  caret-color: var(--accent);
+}
+
+/* Desktop CLI — right pane */
+@media (min-width: 769px) {
+  .cli-sheet {
+    position: relative;
+    bottom: auto;
+    height: auto;
+    width: 380px;
+    min-width: 380px;
+    border-radius: 0;
+    border-top: none;
+    border-left: 1px solid var(--accent);
+    box-shadow: none;
+    transition: none;
+    display: none;
+  }
+
+  .cli-sheet.open {
+    display: flex;
+    bottom: auto;
+  }
+
+  .cli-handle { display: none; }
+
+  #chatScreen { flex-direction: row; }
+}
+
+/* CLI FAB button */
+.cli-toggle-fab {
+  position: fixed;
+  bottom: 80px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99;
+  box-shadow: 0 4px 16px rgba(0,229,160,0.2);
+  transition: all 0.2s;
+}
+
+.cli-toggle-fab:hover { background: var(--accent); color: #000; }
+
+/* ===== MOBILE ===== *//* ===== MOBILE ===== */
 @media (max-width: 768px) {
   /* Hide sidebar on mobile */
   .chat-sidebar { display: none; }
@@ -1038,43 +1428,59 @@ hr { border: none; border-top: 1px solid var(--border); }
 
 <!-- Setup Screen -->
 <div class="screen" id="setupScreen">
-  <div class="setup-header">
-    <div class="setup-title">Choose <span>Your Lesson</span></div>
-    <div class="setup-sub">// Select a section and configure your AI model</div>
-  </div>
-
-  <!-- AI Status Card -->
-  <div class="setup-card" style="max-width: 520px; width: 100%">
-    <div class="setup-card-title">// AI Configuration</div>
-    <div class="key-status saved" id="keyStatus">
-      <span>●</span> Claude API routed via secure server — no key required
+  <div class="setup-hero">
+    <div class="setup-hero-title">PROJECT <span>002</span></div>
+    <div class="setup-hero-sub">Cybersecurity Teaching Platform</div>
+    <div class="setup-status-row">
+      <div class="setup-status-dot"></div>
+      <span id="setupStatusText">AI Ready</span>
     </div>
   </div>
 
-  <!-- Section Loader Card -->
-  <div class="setup-card" style="max-width: 520px; width: 100%">
-    <div class="setup-card-title">// Select Module & Section</div>
-
-    <div class="form-field">
-      <div class="field-label">Module</div>
-      <select id="moduleSelect" onchange="loadSections()" style="background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:11px 14px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;width:100%;cursor:pointer;">
-        <option value="">— Select a module —</option>
-        <option value="module_intro_web_apps">Introduction to Web Applications</option>
-      </select>
+  <div class="module-picker">
+    <div class="module-picker-label">SELECT MODULE</div>
+    <div class="module-list" id="moduleList">
+      <div class="module-item active" onclick="selectModule('module_intro_web_apps', this)">
+        <div class="module-item-num">01</div>
+        <div class="module-item-info">
+          <div class="module-item-title">Introduction to Web Applications</div>
+          <div class="module-item-meta">17 sections · Beginner</div>
+        </div>
+        <div class="module-item-arrow">→</div>
+      </div>
+      <div class="module-item locked">
+        <div class="module-item-num">02</div>
+        <div class="module-item-info">
+          <div class="module-item-title">SQL Injection Fundamentals</div>
+          <div class="module-item-meta">Coming soon</div>
+        </div>
+        <div class="module-item-arrow">🔒</div>
+      </div>
+      <div class="module-item locked">
+        <div class="module-item-num">03</div>
+        <div class="module-item-info">
+          <div class="module-item-title">JavaScript Deobfuscation</div>
+          <div class="module-item-meta">Coming soon</div>
+        </div>
+        <div class="module-item-arrow">🔒</div>
+      </div>
     </div>
+  </div>
 
-    <div class="form-field" id="sectionFieldWrap" style="display:none">
-      <div class="field-label">Section</div>
-      <select id="sectionSelect" onchange="onSectionSelect()" style="background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:11px 14px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;width:100%;cursor:pointer;">
-        <option value="">— Loading sections... —</option>
-      </select>
+  <div class="section-picker" id="sectionPicker" style="display:none">
+    <div class="section-picker-header">
+      <div class="section-picker-label">SELECT SECTION</div>
+      <button class="section-back-btn" onclick="backToModules()">← Back</button>
     </div>
+    <div class="section-list" id="sectionList"></div>
+  </div>
 
-    <div class="selected-file" id="selectedFile"></div>
-
-    <button class="btn-primary" id="startBtn" onclick="startSession()" disabled>
-      Start Lesson →
+  <div class="setup-launch" id="setupLaunch" style="display:none">
+    <div class="launch-info" id="launchInfo"></div>
+    <button class="btn-launch" id="startBtn" onclick="startSession()" disabled>
+      Launch Session →
     </button>
+    <div class="selected-file" id="selectedFile" style="display:none"></div>
   </div>
 </div>
 
@@ -1110,6 +1516,38 @@ hr { border: none; border-top: 1px solid var(--border); }
     <span class="mobile-flag" id="mobileFlagIcon"></span>
     <button class="mobile-end-btn" onclick="endSession()">✕ End</button>
   </div>
+
+  <!-- CLI Bottom Sheet -->
+  <div class="cli-sheet" id="cliSheet">
+    <div class="cli-handle" onclick="toggleCLI()"></div>
+    <div class="cli-header">
+      <div class="cli-title">
+        <span class="cli-dot"></span>
+        <span class="cli-dot"></span>
+        <span class="cli-dot"></span>
+        <span class="cli-title-text">TERMINAL</span>
+      </div>
+      <div class="cli-controls">
+        <button class="cli-clear-btn" onclick="clearCLI()">clear</button>
+        <button class="cli-close-btn" onclick="toggleCLI()">✕</button>
+      </div>
+    </div>
+    <div class="cli-output" id="cliOutput">
+      <div class="cli-line cli-system">Project 002 Simulated Terminal — Type commands to practice</div>
+      <div class="cli-line cli-system">AI is watching and will coach you in the chat pane</div>
+      <div class="cli-line cli-spacer"></div>
+    </div>
+    <div class="cli-input-row">
+      <span class="cli-prompt">$</span>
+      <input type="text" class="cli-input" id="cliInput" placeholder="enter command..." 
+        onkeydown="handleCLIKey(event)" autocomplete="off" autocorrect="off" spellcheck="false"/>
+    </div>
+  </div>
+
+  <!-- CLI Toggle Button (floating) -->
+  <button class="cli-toggle-fab" id="cliToggleFab" onclick="toggleCLI()" style="display:none">
+    <span>⌨</span>
+  </button>
 
   <!-- Chat Main -->
   <div class="chat-main">
@@ -1282,51 +1720,51 @@ const MODULE_SECTIONS = {
   ]
 };
 
-function loadSections() {
-  const module = document.getElementById('moduleSelect').value;
-  const wrap = document.getElementById('sectionFieldWrap');
-  const sel = document.getElementById('sectionSelect');
+let selectedModule = null;
 
-  if (!module) {
-    wrap.style.display = 'none';
-    sectionData = null;
-    checkStartReady();
-    return;
-  }
+function selectModule(moduleKey, el) {
+  selectedModule = moduleKey;
+  document.getElementById('moduleList').style.display = 'none';
+  document.getElementById('sectionPicker').style.display = 'block';
 
-  const sections = MODULE_SECTIONS[module] || [];
-  sel.innerHTML = '<option value="">— Select a section —</option>';
+  const sections = MODULE_SECTIONS[moduleKey] || [];
+  const list = document.getElementById('sectionList');
+  list.innerHTML = '';
+
   sections.forEach(s => {
-    const opt = document.createElement('option');
-    opt.value = JSON.stringify(s);
-    opt.textContent = `${s.num} — ${s.title}`;
-    sel.appendChild(opt);
+    const item = document.createElement('div');
+    item.className = 'section-item';
+    item.innerHTML = `
+      <span class="section-item-num">${s.num}</span>
+      <span class="section-item-title">${s.title}</span>
+      <span class="section-item-flag">${s.hasFlag ? '🏴' : ''}</span>
+    `;
+    item.onclick = () => onSectionClick(s, item);
+    list.appendChild(item);
   });
-
-  wrap.style.display = 'block';
-  sectionData = null;
-  checkStartReady();
 }
 
-async function onSectionSelect() {
-  const val = document.getElementById('sectionSelect').value;
-  if (!val) {
-    sectionData = null;
-    document.getElementById('selectedFile').style.display = 'none';
-    checkStartReady();
-    return;
-  }
+function backToModules() {
+  selectedModule = null;
+  sectionData = null;
+  document.getElementById('moduleList').style.display = 'flex';
+  document.getElementById('sectionPicker').style.display = 'none';
+  document.getElementById('setupLaunch').style.display = 'none';
+}
 
-  const section = JSON.parse(val);
-  const module = document.getElementById('moduleSelect').value;
-  const path = `${module}/${section.file}`;
+async function onSectionClick(section, el) {
+  // Deselect others
+  document.querySelectorAll('.section-item').forEach(i => i.classList.remove('selected'));
+  el.classList.add('selected');
 
-  const fileEl = document.getElementById('selectedFile');
-  fileEl.textContent = '⟳ Loading from Supabase...';
-  fileEl.style.display = 'block';
-  fileEl.style.color = 'var(--text-muted)';
-  fileEl.style.borderColor = 'var(--border2)';
-  fileEl.style.background = 'transparent';
+  const path = `${selectedModule}/${section.file}`;
+  const launchEl = document.getElementById('setupLaunch');
+  const launchInfo = document.getElementById('launchInfo');
+  const startBtn = document.getElementById('startBtn');
+
+  launchEl.style.display = 'flex';
+  launchInfo.textContent = '⟳ Loading section...';
+  startBtn.disabled = true;
 
   try {
     const { data, error } = await sbClient.storage
@@ -1339,27 +1777,25 @@ async function onSectionSelect() {
     sectionData = JSON.parse(text);
     const lesson = sectionData.lesson;
 
-    fileEl.textContent = `✓ Section ${lesson.section} — ${lesson.title}${lesson.practice_flag ? ' 🏴' : ''}`;
-    fileEl.style.color = 'var(--accent)';
-    fileEl.style.borderColor = 'var(--accent)';
-    fileEl.style.background = 'var(--accent-dim)';
-    checkStartReady();
+    launchInfo.textContent = `✓ ${lesson.title} — Section ${lesson.section}/${lesson.total_sections}`;
+    startBtn.disabled = false;
 
   } catch(e) {
-    fileEl.textContent = `✗ Failed to load: ${e.message}`;
-    fileEl.style.color = 'var(--danger)';
-    fileEl.style.borderColor = 'var(--danger)';
+    launchInfo.textContent = `✗ Failed to load: ${e.message}`;
+    launchInfo.style.color = 'var(--danger)';
     sectionData = null;
-    checkStartReady();
+    startBtn.disabled = true;
   }
 }
 
-function handleFileUpload(e) {
-  // kept for fallback compatibility
-}
+// Legacy compat
+function loadSections() {}
+async function onSectionSelect() {}
+function handleFileUpload(e) {}
 
 function checkStartReady() {
-  document.getElementById('startBtn').disabled = !sectionData;
+  const btn = document.getElementById('startBtn');
+  if (btn) btn.disabled = !sectionData;
 }
 
 // ==================== SESSION ====================
@@ -1581,6 +2017,7 @@ async function startSession() {
   showScreen('chatScreen');
   document.getElementById('settingsBtn').style.display = 'none';
   document.getElementById('endBtn').style.display = 'block';
+  showCLIButton();
 
   // Check for existing session
   const lastSession = await loadLastSession(lesson.section, lesson.module);
@@ -1635,14 +2072,21 @@ function buildPhaseNav() {
 async function endSession() {
   await markSessionComplete();
   currentSessionId = null;
+
+  // Close CLI if open
+  if (cliOpen) toggleCLI();
+  document.getElementById('cliToggleFab').style.display = 'none';
+
   showScreen('setupScreen');
   document.getElementById('endBtn').style.display = 'none';
   document.getElementById('settingsBtn').style.display = 'block';
   conversationHistory = [];
   sectionData = null;
   currentNodeIndex = 0;
-  document.getElementById('selectedFile').style.display = 'none';
   document.getElementById('startBtn').disabled = true;
+
+  // Reset setup screen state
+  backToModules();
 }
 
 function goToSetup() {
@@ -1949,6 +2393,158 @@ function showToast(msg, success = false) {
   toast.textContent = msg;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
+}
+
+// ==================== CLI ====================
+let cliOpen = false;
+let cliHistory = [];
+let cliHistoryIndex = -1;
+const CLI_COMMANDS = ['nmap', 'curl', 'wget', 'ping', 'ls', 'cd', 'cat', 'grep', 'echo', 'whoami', 'id', 'uname', 'ps', 'netstat', 'ss', 'dig', 'host', 'whois', 'sqlmap', 'nikto', 'dirb', 'gobuster', 'hydra', 'john', 'hashcat', 'burpsuite', 'help', 'clear'];
+
+function toggleCLI() {
+  const sheet = document.getElementById('cliSheet');
+  cliOpen = !cliOpen;
+  sheet.classList.toggle('open', cliOpen);
+  if (cliOpen) {
+    setTimeout(() => document.getElementById('cliInput').focus(), 350);
+  }
+}
+
+function showCLIButton() {
+  document.getElementById('cliToggleFab').style.display = 'flex';
+}
+
+function clearCLI() {
+  const out = document.getElementById('cliOutput');
+  out.innerHTML = '<div class="cli-line cli-system">Terminal cleared</div>';
+}
+
+function cliPrint(text, type = 'output-text') {
+  const out = document.getElementById('cliOutput');
+  const line = document.createElement('div');
+  line.className = `cli-line cli-${type}`;
+  line.textContent = text;
+  out.appendChild(line);
+  out.scrollTop = out.scrollHeight;
+}
+
+function handleCLIKey(e) {
+  if (e.key === 'Enter') {
+    const input = document.getElementById('cliInput');
+    const cmd = input.value.trim();
+    if (!cmd) return;
+
+    cliHistory.unshift(cmd);
+    cliHistoryIndex = -1;
+    input.value = '';
+
+    cliPrint(`$ ${cmd}`, 'input-echo');
+    processCLICommand(cmd);
+
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (cliHistoryIndex < cliHistory.length - 1) {
+      cliHistoryIndex++;
+      document.getElementById('cliInput').value = cliHistory[cliHistoryIndex];
+    }
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (cliHistoryIndex > 0) {
+      cliHistoryIndex--;
+      document.getElementById('cliInput').value = cliHistory[cliHistoryIndex];
+    } else {
+      cliHistoryIndex = -1;
+      document.getElementById('cliInput').value = '';
+    }
+  } else if (e.key === 'Tab') {
+    e.preventDefault();
+    const input = document.getElementById('cliInput');
+    const partial = input.value.toLowerCase();
+    const match = CLI_COMMANDS.find(c => c.startsWith(partial));
+    if (match) input.value = match + ' ';
+  }
+}
+
+async function processCLICommand(cmd) {
+  const parts = cmd.trim().split(/\s+/);
+  const command = parts[0].toLowerCase();
+
+  // Built-in commands
+  if (command === 'clear') { clearCLI(); return; }
+  if (command === 'help') {
+    cliPrint('Available commands: ' + CLI_COMMANDS.join(', '), 'system');
+    cliPrint('Type any command — AI will simulate the response and coach you', 'system');
+    return;
+  }
+  if (command === 'history') {
+    cliHistory.forEach((h, i) => cliPrint(`${i + 1}  ${h}`));
+    return;
+  }
+
+  // Send to AI for simulation
+  cliPrint('...', 'system');
+  const cliPrompt = `The learner just ran this command in the terminal: \`${cmd}\`
+
+Simulate realistic terminal output for this command in the context of the current lesson (web application penetration testing). 
+Keep output concise and realistic. After the output, add a brief coaching note on a new line starting with [COACH]:
+Format: 
+<simulated output>
+[COACH]: your coaching note`;
+
+  try {
+    const { data: { session } } = await sbClient.auth.getSession();
+    if (!session) return;
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/claude-proxy`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({
+        system: systemPrompt,
+        messages: [
+          ...conversationHistory.slice(-6),
+          { role: 'user', content: cliPrompt }
+        ]
+      })
+    });
+
+    const data = await response.json();
+    if (data.error) { cliPrint('Error: ' + data.error, 'error'); return; }
+
+    const reply = data.content[0].text;
+
+    // Split output from coach note
+    const coachSplit = reply.split('[COACH]:');
+    const output = coachSplit[0].trim();
+    const coach = coachSplit[1]?.trim();
+
+    // Remove the ... placeholder
+    const out = document.getElementById('cliOutput');
+    const dots = out.lastElementChild;
+    if (dots?.textContent === '...') dots.remove();
+
+    // Print terminal output
+    output.split('\n').forEach(line => cliPrint(line, 'output-text'));
+
+    // Print coach note in chat
+    if (coach) {
+      addMessage('assistant', `**Terminal:** \`${cmd}\`
+
+${coach}`);
+      conversationHistory.push({ role: 'assistant', content: `Terminal: ${cmd}
+
+${coach}` });
+    }
+
+  } catch(e) {
+    const out = document.getElementById('cliOutput');
+    const dots = out.lastElementChild;
+    if (dots?.textContent === '...') dots.remove();
+    cliPrint('Connection error', 'error');
+  }
 }
 
 // ==================== VOICE ====================
