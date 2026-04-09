@@ -1534,7 +1534,9 @@ async function callClaude(messages) {
         'apikey': SUPABASE_ANON_KEY
       },
       body: JSON.stringify({
-        system: systemPrompt,
+        section_id: sectionData?.lesson?.section,
+        module: sectionData?.lesson?.module,
+        node_index: currentNodeIndex,
         messages: messages
       })
     });
