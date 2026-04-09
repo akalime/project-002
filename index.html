@@ -1931,7 +1931,7 @@ async function handleAuth() {
       await postLogin();
     }
   } catch(e) {
-    showAuthError('Connection error — check Supabase config');
+    showAuthError('Error: ' + (e.message || JSON.stringify(e)));
   }
 
   btn.disabled = false;
