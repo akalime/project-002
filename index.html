@@ -325,6 +325,7 @@ input:focus {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
 }
 
 .module-item {
@@ -1663,7 +1664,7 @@ hr { border: none; border-top: 1px solid var(--border); }
   <div class="module-picker">
     <div class="module-picker-label">SELECT MODULE</div>
     <div class="module-list" id="moduleList">
-      <div class="module-item active" onclick="selectModule('module_intro_web_apps', this)">
+      <div class="module-item" onclick="selectModule('module_intro_web_apps', this)">
         <div class="module-item-num">01</div>
         <div class="module-item-info">
           <div class="module-item-title">Introduction to Web Applications</div>
@@ -2015,8 +2016,11 @@ function backToModules() {
   selectedModule = null;
   sectionData = null;
   document.getElementById('moduleList').style.display = 'flex';
+  document.getElementById('moduleList').style.flexDirection = 'column';
   document.getElementById('sectionPicker').style.display = 'none';
   document.getElementById('setupLaunch').style.display = 'none';
+  const startBtn = document.getElementById('startBtn');
+  if (startBtn) startBtn.disabled = true;
 }
 
 async function onSectionClick(section, el) {
