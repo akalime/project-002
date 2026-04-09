@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project 002</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,700;1,400&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;700&display=swap');
+
+:root {
+  --bg: #080810;
+  --surface: #0e0e1a;
+  --surface2: #141424;
+  --border: #1a1a2e;
+  --border2: #252540;
+  --accent: #00e5a0;
+  --accent-dim: rgba(0,229,160,0.12);
+  --accent-glow: rgba(0,229,160,0.3);
+  --danger: #ff3864;
+  --danger-dim: rgba(255,56,100,0.12);
+  --warn: #ffbe00;
+  --text: #ddddf5;
+  --text-muted: #4a4a6a;
+  --text-dim: #7a7a9a;
+  --code: #a0e0ff;
+  --code-bg: #060612;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Scanline overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* Noise texture */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 999;
+  opacity: 0.6;
+}
+
+/* ===== HEADER ===== */
+.header {
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  height: 52px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+  gap: 16px;
+  z-index: 10;
+}
+
+.logo {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 22px;
+  letter-spacing: 4px;
+  color: var(--accent);
+  text-shadow: 0 0 20px var(--accent-glow);
+}
+
+.logo-dot { color: var(--text-dim); font-size: 14px; letter-spacing: 0; }
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.status-dot.online {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.header-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--text-dim);
+  transition: all 0.2s;
+  letter-spacing: 0.5px;
+}
+
+.header-btn:hover { border-color: var(--accent); color: var(--accent); }
+.header-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+
+/* ===== SCREENS ===== */
+.screen { display: none; flex: 1; overflow: hidden; }
+.screen.active { display: flex; }
+
+/* ===== AUTH SCREEN ===== */
+#authScreen {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 40px;
+}
+
+.auth-hero {
+  text-align: center;
+}
+
+.auth-title {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 72px;
+  letter-spacing: 8px;
+  line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 0 40px var(--accent-glow), 0 0 80px rgba(0,229,160,0.1);
+}
+
+.auth-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--bg);
+  padding: 3px;
+  border-radius: 6px;
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 8px;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  color: var(--text-muted);
+  transition: all 0.2s;
+  background: transparent;
+  border: none;
+}
+
+.auth-tab.active {
+  background: var(--surface2);
+  color: var(--accent);
+}
+
+.form-field { display: flex; flex-direction: column; gap: 8px; }
+
+.field-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+input {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 11px 14px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+}
+
+input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  padding: 13px 24px;
+  border-radius: 6px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.3px;
+}
+
+.btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 4px 20px var(--accent-glow); }
+.btn-primary:active { transform: none; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.auth-error {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--danger);
+  text-align: center;
+  padding: 8px;
+  border: 1px solid var(--danger-dim);
+  border-radius: 4px;
+  background: var(--danger-dim);
+  display: none;
+}
+
+/* ===== SETUP SCREEN ===== */
+#setupScreen {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 40px;
+  overflow-y: auto;
+}
+
+.setup-header {
+  text-align: center;
+}
+
+.setup-title {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 42px;
+  letter-spacing: 4px;
+  color: var(--text);
+}
+
+.setup-title span { color: var(--accent); }
+
+.setup-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.setup-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.setup-card-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.api-key-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.api-key-row input { flex: 1; }
+
+.btn-save {
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 11px 18px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-save:hover { background: var(--accent); color: #000; }
+
+.key-status {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.key-status.saved { color: var(--accent); }
+.key-status.missing { color: var(--text-muted); }
+
+/* Section browser */
+.section-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.section-grid::-webkit-scrollbar { width: 3px; }
+.section-grid::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.section-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.section-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent-dim);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.section-card:hover { border-color: var(--accent); }
+.section-card:hover::before { opacity: 1; }
+.section-card.selected { border-color: var(--accent); background: var(--accent-dim); }
+
+.sec-num {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 22px;
+  color: var(--accent);
+  letter-spacing: 1px;
+  line-height: 1;
+}
+
+.sec-title {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+.sec-flag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 10px;
+}
+
+.upload-zone {
+  border: 2px dashed var(--border2);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.upload-zone:hover { border-color: var(--accent); background: var(--accent-dim); }
+.upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+.upload-icon { font-size: 24px; margin-bottom: 6px; }
+.upload-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.selected-file {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--accent);
+  padding: 8px 12px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  display: none;
+}
+
+/* ===== CHAT SCREEN ===== */
+#chatScreen { flex-direction: row; }
+
+.chat-sidebar {
+  width: 220px;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sidebar-section {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 10px;
+}
+
+.lesson-info-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.lesson-info-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.progress-bar {
+  height: 3px;
+  background: var(--border2);
+  border-radius: 2px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.5s ease;
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.nav-item {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: default;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+  transition: all 0.2s;
+}
+
+.nav-item.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid rgba(0,229,160,0.2);
+}
+
+.nav-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--border2);
+  flex-shrink: 0;
+}
+
+.nav-item.active .nav-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+
+.sidebar-footer {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.flag-display {
+  background: var(--danger-dim);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--danger);
+  display: none;
+}
+
+.flag-display.captured {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+  display: block;
+}
+
+/* Chat main */
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-behavior: smooth;
+}
+
+.messages::-webkit-scrollbar { width: 4px; }
+.messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.msg {
+  display: flex;
+  gap: 12px;
+  animation: msgIn 0.25s ease;
+  max-width: 820px;
+}
+
+@keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.msg.user { flex-direction: row-reverse; align-self: flex-end; }
+.msg.assistant { align-self: flex-start; }
+
+.msg-avatar {
+  width: 30px; height: 30px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Bebas Neue', cursive;
+  font-size: 13px;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.msg.assistant .msg-avatar {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid rgba(0,229,160,0.3);
+}
+
+.msg.user .msg-avatar {
+  background: var(--danger-dim);
+  color: var(--danger);
+  border: 1px solid rgba(255,56,100,0.3);
+}
+
+.msg-content { flex: 1; }
+
+.msg-bubble {
+  padding: 12px 16px;
+  border-radius: 10px;
+  line-height: 1.65;
+  font-size: 14px;
+  word-wrap: break-word;
+}
+
+.msg-bubble strong, .msg-bubble b {
+  font-size: 14px !important;
+  font-weight: 700;
+}
+
+.msg-bubble em, .msg-bubble i {
+  font-size: 14px !important;
+  font-style: italic;
+}
+
+.msg-bubble p {
+  font-size: 14px;
+  margin: 0;
+}
+
+.msg.assistant .msg-bubble {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top-left-radius: 2px;
+  color: var(--text);
+}
+
+.msg.user .msg-bubble {
+  background: var(--danger);
+  color: #fff;
+  border-top-right-radius: 2px;
+  font-weight: 500;
+}
+
+.msg-bubble strong { color: var(--accent); }
+.msg.user .msg-bubble strong { color: #fff; font-weight: 800; }
+
+.msg-bubble code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  background: var(--code-bg);
+  color: var(--code);
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+.msg-bubble pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  margin: 10px 0;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--code);
+  line-height: 1.6;
+}
+
+.msg-bubble em { color: var(--text-dim); font-style: italic; }
+
+.typing-bubble {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  border-top-left-radius: 2px;
+  padding: 14px 18px;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.tdot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: tdot 1.4s ease-in-out infinite;
+}
+
+.tdot:nth-child(2) { animation-delay: 0.2s; }
+.tdot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes tdot { 0%,80%,100%{transform:scale(1);opacity:0.5} 40%{transform:scale(1.3);opacity:1} }
+
+/* Input area */
+.input-area {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.input-wrap {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: flex-end;
+}
+
+.input-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.chat-textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: 11px 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  outline: none;
+  resize: none;
+  min-height: 44px;
+  max-height: 120px;
+  line-height: 1.5;
+}
+
+.chat-textarea::placeholder { color: var(--text-muted); }
+
+.send-btn {
+  background: var(--accent);
+  border: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #000;
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.send-btn:hover { filter: brightness(1.1); box-shadow: 0 0 16px var(--accent-glow); }
+.send-btn:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; }
+
+/* Special message types */
+.system-msg {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 6px 0;
+}
+
+.flag-reveal {
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--accent);
+  text-align: center;
+  align-self: center;
+  animation: flagGlow 0.5s ease;
+}
+
+@keyframes flagGlow {
+  0% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { box-shadow: 0 0 30px 10px var(--accent-glow); }
+  100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+}
+
+/* Error toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--danger);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  z-index: 9999;
+  animation: toastIn 0.3s ease;
+  max-width: 360px;
+}
+
+@keyframes toastIn { from { transform: translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Loading overlay */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 500;
+  transition: opacity 0.4s;
+}
+
+.loading-logo {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 64px;
+  letter-spacing: 8px;
+  color: var(--accent);
+  text-shadow: 0 0 40px var(--accent-glow);
+  animation: logoPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes logoPulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+.loading-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.loading-bar {
+  width: 200px;
+  height: 2px;
+  background: var(--border2);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.loading-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 1px;
+  animation: loadBar 1.5s ease-in-out infinite;
+}
+
+@keyframes loadBar { 0%{transform:translateX(-100%)} 100%{transform:translateX(200%)} }
+
+/* Divider */
+hr { border: none; border-top: 1px solid var(--border); }
+
+/* Scrollbar global */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-logo">PROJECT 002</div>
+  <div class="loading-text">Initializing</div>
+  <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">PROJECT<span class="logo-dot"> ◆ </span>002</div>
+  <div class="header-status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">connecting...</span>
+  </div>
+  <button class="header-btn" id="settingsBtn" style="display:none" onclick="goToSetup()">⚙ Settings</button>
+  <button class="header-btn danger" id="endBtn" style="display:none" onclick="endSession()">✕ End Session</button>
+  <button class="header-btn danger" id="logoutBtn" style="display:none" onclick="logout()">↩ Logout</button>
+</div>
+
+<!-- Auth Screen -->
+<div class="screen" id="authScreen">
+  <div class="auth-hero">
+    <div class="auth-title">PROJECT 002</div>
+    <div class="auth-sub">Cybersecurity Teaching Platform</div>
+  </div>
+
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')">Login</button>
+      <button class="auth-tab" onclick="switchTab('signup')">Sign Up</button>
+    </div>
+
+    <div class="form-field">
+      <div class="field-label">Email</div>
+      <input type="email" id="authEmail" placeholder="you@example.com" />
+    </div>
+
+    <div class="form-field">
+      <div class="field-label">Password</div>
+      <input type="password" id="authPassword" placeholder="••••••••"
+        onkeydown="if(event.key==='Enter') handleAuth()" />
+    </div>
+
+    <div class="auth-error" id="authError"></div>
+
+    <button class="btn-primary" id="authBtn" onclick="handleAuth()">Login</button>
+  </div>
+</div>
+
+<!-- Setup Screen -->
+<div class="screen" id="setupScreen">
+  <div class="setup-header">
+    <div class="setup-title">Choose <span>Your Lesson</span></div>
+    <div class="setup-sub">// Select a section and configure your AI model</div>
+  </div>
+
+  <!-- AI Status Card -->
+  <div class="setup-card" style="max-width: 520px; width: 100%">
+    <div class="setup-card-title">// AI Configuration</div>
+    <div class="key-status saved" id="keyStatus">
+      <span>●</span> Claude API routed via secure server — no key required
+    </div>
+  </div>
+
+  <!-- Section Loader Card -->
+  <div class="setup-card" style="max-width: 520px; width: 100%">
+    <div class="setup-card-title">// Select Module & Section</div>
+
+    <div class="form-field">
+      <div class="field-label">Module</div>
+      <select id="moduleSelect" onchange="loadSections()" style="background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:11px 14px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;width:100%;cursor:pointer;">
+        <option value="">— Select a module —</option>
+        <option value="module_intro_web_apps">Introduction to Web Applications</option>
+      </select>
+    </div>
+
+    <div class="form-field" id="sectionFieldWrap" style="display:none">
+      <div class="field-label">Section</div>
+      <select id="sectionSelect" onchange="onSectionSelect()" style="background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:11px 14px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;width:100%;cursor:pointer;">
+        <option value="">— Loading sections... —</option>
+      </select>
+    </div>
+
+    <div class="selected-file" id="selectedFile"></div>
+
+    <button class="btn-primary" id="startBtn" onclick="startSession()" disabled>
+      Start Lesson →
+    </button>
+  </div>
+</div>
+
+<!-- Chat Screen -->
+<div class="screen" id="chatScreen">
+  <!-- Sidebar -->
+  <div class="chat-sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Current Lesson</div>
+      <div class="lesson-info-title" id="lessonTitle">—</div>
+      <div class="lesson-info-meta" id="lessonMeta">—</div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Phase</div>
+      <div class="sidebar-nav" id="phaseNav">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="flag-display" id="flagDisplay">🏴 Flag Captured</div>
+    </div>
+  </div>
+
+  <!-- Chat Main -->
+  <div class="chat-main">
+    <div class="messages" id="messages"></div>
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea class="chat-textarea" id="userInput"
+          placeholder="Type your answer... (Enter to send, Shift+Enter for newline)"
+          onkeydown="handleChatKey(event)"
+          oninput="autoResize(this)"></textarea>
+      </div>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">↑</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== SUPABASE CONFIG ====================
+// REPLACE THESE WITH YOUR ACTUAL SUPABASE PROJECT VALUES
+const SUPABASE_URL = 'https://obobtgryhcrptcyaukvw.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ib2J0Z3J5aGNycHRjeWF1a3Z3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3MTUxMzQsImV4cCI6MjA5MTI5MTEzNH0.o3Rq3VqTN6uWzX4Uqfqd8VpH2wlS5PmoDvtRQOMc9EU';
+
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ==================== STATE ====================
+let currentUser = null;
+let sectionData = null;
+let conversationHistory = [];
+let usedMethods = [];
+let messageCount = 0;
+let systemPrompt = '';
+// API key handled server-side via Edge Function
+let currentPhaseIndex = 0;
+
+// ==================== INIT ====================
+async function init() {
+  try {
+    const { data: { session } } = await sbClient.auth.getSession();
+    if (session) {
+      currentUser = session.user;
+      await postLogin();
+    } else {
+      showScreen('authScreen');
+      setStatus(false, 'not authenticated');
+    }
+  } catch(e) {
+    showScreen('authScreen');
+    setStatus(false, 'offline');
+  }
+  document.getElementById('loadingOverlay').style.opacity = '0';
+  setTimeout(() => document.getElementById('loadingOverlay').style.display = 'none', 400);
+}
+
+async function postLogin() {
+  setStatus(true, currentUser.email.split('@')[0]);
+  document.getElementById('logoutBtn').style.display = 'block';
+  document.getElementById('settingsBtn').style.display = 'block';
+  // API key handled server-side
+  showScreen('setupScreen');
+}
+
+// ==================== AUTH ====================
+let authMode = 'login';
+
+function switchTab(mode) {
+  authMode = mode;
+  document.querySelectorAll('.auth-tab').forEach((t,i) => {
+    t.classList.toggle('active', (i === 0 && mode === 'login') || (i === 1 && mode === 'signup'));
+  });
+  document.getElementById('authBtn').textContent = mode === 'login' ? 'Login' : 'Sign Up';
+  hideAuthError();
+}
+
+async function handleAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const btn = document.getElementById('authBtn');
+
+  if (!email || !password) { showAuthError('Email and password required'); return; }
+
+  btn.disabled = true;
+  btn.textContent = authMode === 'login' ? 'Logging in...' : 'Creating account...';
+
+  try {
+    let result;
+    if (authMode === 'login') {
+      result = await sbClient.auth.signInWithPassword({ email, password });
+    } else {
+      result = await sbClient.auth.signUp({ email, password });
+    }
+
+    if (result.error) {
+      showAuthError(result.error.message);
+    } else {
+      currentUser = result.data.user;
+      await postLogin();
+    }
+  } catch(e) {
+    showAuthError('Connection error — check Supabase config');
+  }
+
+  btn.disabled = false;
+  btn.textContent = authMode === 'login' ? 'Login' : 'Sign Up';
+}
+
+async function logout() {
+  await sbClient.auth.signOut();
+  currentUser = null;
+  sectionData = null;
+  conversationHistory = [];
+  apiKey = '';
+  document.getElementById('logoutBtn').style.display = 'none';
+  document.getElementById('settingsBtn').style.display = 'none';
+  document.getElementById('endBtn').style.display = 'none';
+  showScreen('authScreen');
+  setStatus(false, 'logged out');
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('authError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function hideAuthError() {
+  document.getElementById('authError').style.display = 'none';
+}
+
+// ==================== API KEY MANAGEMENT ====================
+// saveApiKey removed — keys handled server-side
+
+async function loadApiKeyStatus() { /* handled server-side */ }
+
+function setKeyStatus(saved) {
+  const el = document.getElementById('keyStatus');
+  if (saved) {
+    el.className = 'key-status saved';
+    el.innerHTML = '<span>●</span> API key stored';
+  } else {
+    el.className = 'key-status missing';
+    el.innerHTML = '<span>○</span> No API key stored';
+  }
+  checkStartReady();
+}
+
+// ==================== FILE UPLOAD ====================
+// ==================== BUCKET BROWSER ====================
+const BUCKET_NAME = 'project002-docs';
+
+const MODULE_SECTIONS = {
+  'module_intro_web_apps': [
+    { num: '01', title: 'Introduction', file: 'section_01.json' },
+    { num: '02', title: 'Web Application Layout', file: 'section_02.json' },
+    { num: '03', title: 'Front End vs Back End', file: 'section_03.json' },
+    { num: '04', title: 'HTML', file: 'section_04.json' },
+    { num: '05', title: 'CSS', file: 'section_05.json' },
+    { num: '06', title: 'JavaScript', file: 'section_06.json' },
+    { num: '07', title: 'Sensitive Data Exposure', file: 'section_07.json' },
+    { num: '08', title: 'HTML Injection', file: 'section_08.json' },
+    { num: '09', title: 'Cross-Site Scripting (XSS)', file: 'section_09.json' },
+    { num: '10', title: 'CSRF', file: 'section_10.json' },
+    { num: '11', title: 'Back End Servers', file: 'section_11.json' },
+    { num: '12', title: 'Web Servers', file: 'section_12.json' },
+    { num: '13', title: 'Databases', file: 'section_13.json' },
+    { num: '14', title: 'Frameworks & APIs', file: 'section_14.json' },
+    { num: '15', title: 'Common Web Vulnerabilities', file: 'section_15.json' },
+    { num: '16', title: 'Public Vulnerabilities', file: 'section_16.json' },
+    { num: '17', title: 'Next Steps', file: 'section_17.json' },
+  ]
+};
+
+function loadSections() {
+  const module = document.getElementById('moduleSelect').value;
+  const wrap = document.getElementById('sectionFieldWrap');
+  const sel = document.getElementById('sectionSelect');
+
+  if (!module) {
+    wrap.style.display = 'none';
+    sectionData = null;
+    checkStartReady();
+    return;
+  }
+
+  const sections = MODULE_SECTIONS[module] || [];
+  sel.innerHTML = '<option value="">— Select a section —</option>';
+  sections.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = JSON.stringify(s);
+    opt.textContent = `${s.num} — ${s.title}`;
+    sel.appendChild(opt);
+  });
+
+  wrap.style.display = 'block';
+  sectionData = null;
+  checkStartReady();
+}
+
+async function onSectionSelect() {
+  const val = document.getElementById('sectionSelect').value;
+  if (!val) {
+    sectionData = null;
+    document.getElementById('selectedFile').style.display = 'none';
+    checkStartReady();
+    return;
+  }
+
+  const section = JSON.parse(val);
+  const module = document.getElementById('moduleSelect').value;
+  const path = `${module}/${section.file}`;
+
+  const fileEl = document.getElementById('selectedFile');
+  fileEl.textContent = '⟳ Loading from Supabase...';
+  fileEl.style.display = 'block';
+  fileEl.style.color = 'var(--text-muted)';
+  fileEl.style.borderColor = 'var(--border2)';
+  fileEl.style.background = 'transparent';
+
+  try {
+    const { data, error } = await sbClient.storage
+      .from(BUCKET_NAME)
+      .download(path);
+
+    if (error) throw error;
+
+    const text = await data.text();
+    sectionData = JSON.parse(text);
+    const lesson = sectionData.lesson;
+
+    fileEl.textContent = `✓ Section ${lesson.section} — ${lesson.title}${lesson.practice_flag ? ' 🏴' : ''}`;
+    fileEl.style.color = 'var(--accent)';
+    fileEl.style.borderColor = 'var(--accent)';
+    fileEl.style.background = 'var(--accent-dim)';
+    checkStartReady();
+
+  } catch(e) {
+    fileEl.textContent = `✗ Failed to load: ${e.message}`;
+    fileEl.style.color = 'var(--danger)';
+    fileEl.style.borderColor = 'var(--danger)';
+    sectionData = null;
+    checkStartReady();
+  }
+}
+
+function handleFileUpload(e) {
+  // kept for fallback compatibility
+}
+
+function checkStartReady() {
+  document.getElementById('startBtn').disabled = !sectionData;
+}
+
+// ==================== SESSION ====================
+// Node tracking
+let currentNodeIndex = 0;
+  usedMethods = [];
+  messageCount = 0;
+
+function getCurrentNode() {
+  if (!sectionData) return null;
+  return sectionData.teaching_path[currentNodeIndex] || null;
+}
+
+function advanceNode() {
+  if (!sectionData) return;
+  if (currentNodeIndex < sectionData.teaching_path.length - 1) {
+    currentNodeIndex++;
+    updatePhaseNav();
+    buildSystemPromptForCurrentNode();
+    addSystemMsg(`Moving to: ${getCurrentNode()?.title || getCurrentNode()?.phase || 'next phase'}`);
+  }
+}
+
+function buildSystemPromptForCurrentNode() {
+  if (!sectionData) return;
+  systemPrompt = buildSystemPrompt(sectionData);
+}
+
+function buildSystemPrompt(data) {
+  const base = data.system_prompt || '';
+  const lesson = data.lesson;
+  const node = data.teaching_path[currentNodeIndex];
+  const nextNode = data.teaching_path[currentNodeIndex + 1] || null;
+
+  // Only include datasets relevant to current node phase
+  const relevantDatasets = getRelevantDatasets(data, node);
+
+  return `${base}
+
+LESSON CONTEXT:
+- Title: ${lesson.title}
+- Section: ${lesson.section}/${lesson.total_sections}
+- Difficulty: ${lesson.difficulty}
+- Prerequisites: ${(lesson.prerequisites || []).join(', ') || 'None'}
+
+CURRENT TEACHING NODE (${currentNodeIndex + 1} of ${data.teaching_path.length}):
+${JSON.stringify(node, null, 2)}
+
+${nextNode ? `NEXT NODE PREVIEW (do not jump to this yet):
+Type: ${nextNode.type} | Phase: ${nextNode.phase}` : 'This is the final node.'}
+
+TEACHING RULES:
+${JSON.stringify(data.teaching_rules, null, 2)}
+
+${relevantDatasets ? `REFERENCE DATA FOR THIS NODE:
+${JSON.stringify(relevantDatasets, null, 2)}` : ''}
+
+PRACTICE:
+- Question: ${lesson.practice_question || 'None'}
+- Flag: ${lesson.practice_flag || 'Extracted during practice'}
+
+TEACHING VARIETY — METHODS USED SO FAR THIS SESSION: ${usedMethods.length > 0 ? usedMethods.join(', ') : 'none yet'}
+Total exchanges this session: ${messageCount}
+If you have already used a method 2+ times, switch to a different approach. Available methods: socratic questioning, direct explanation, analogy, real world example, scenario simulation, memory anchor, code walkthrough, challenge question, compare and contrast.
+
+CRITICAL SEQUENCING RULES:
+1. You are ONLY teaching the CURRENT NODE above. Do not reference content from other nodes.
+2. Do not jump ahead to the next node until the learner demonstrates understanding of the current one.
+3. When the learner has clearly mastered the current node, end your response with exactly: [NODE_COMPLETE]
+4. Never include content, examples, or attack scenarios from nodes you have not reached yet.
+5. If the learner asks about something in a future node, say "we will get to that" and redirect.
+
+TEACHING BALANCE — CRITICAL:
+- DO NOT use pure Socratic questioning. That feels like an interrogation, not a lesson.
+- The correct flow for every concept is: EXPLAIN first, then CHALLENGE.
+- Step 1: Deliver the concept clearly using the content field from the current node. Give the learner the information they need.
+- Step 2: Ask ONE question to reinforce or deepen understanding of what you just taught.
+- Step 3: If they answer correctly, push deeper or confirm and move on.
+- Step 4: If they struggle after 2 attempts, give the answer directly then ask them to explain it back.
+- Never ask more than 2 questions in a row without delivering new information.
+- Think of yourself as a teacher who explains things clearly, not a therapist who only asks questions.
+- A good lesson rhythm: explain → question → explain more → question → confirm → advance.`;
+}
+
+function getRelevantDatasets(data, node) {
+  if (!data.datasets || !node) return null;
+  const phase = node.phase || '';
+  
+  // Map phases to relevant dataset keys
+  const phaseDatasetMap = {
+    'security_risks': ['attack_types'],
+    'payload_mechanics': ['common_payloads', 'xss_types'],
+    'apply_concepts': ['attack_types', 'xss_types'],
+    'real_world_attacks': ['common_payloads'],
+    'consolidation': ['xss_types', 'common_payloads'],
+    'hands_on': ['common_payloads'],
+    'stacks': ['technology_stacks'],
+    'http_codes': ['http_codes_pentest'],
+    'web_servers': ['web_server_fingerprints'],
+    'relational': ['databases_pentest'],
+    'nosql': ['databases_pentest'],
+    'apis': ['rest_method_abuse', 'framework_fingerprints'],
+    'developer_mistakes': ['developer_mistakes_top10', 'owasp_top_10'],
+    'owasp_top_10': ['owasp_top_10'],
+  };
+
+  const relevantKeys = phaseDatasetMap[phase] || [];
+  if (relevantKeys.length === 0) return null;
+
+  const result = {};
+  relevantKeys.forEach(key => {
+    if (data.datasets[key]) result[key] = data.datasets[key];
+  });
+  
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+function startSession() {
+  if (!sectionData) return;
+
+  systemPrompt = buildSystemPrompt(sectionData);
+  conversationHistory = [];
+  currentPhaseIndex = 0;
+  currentNodeIndex = 0;
+  usedMethods = [];
+  messageCount = 0;
+
+  // Update UI
+  const lesson = sectionData.lesson;
+  document.getElementById('lessonTitle').textContent = lesson.title;
+  document.getElementById('lessonMeta').textContent = `Section ${lesson.section} of ${lesson.total_sections}`;
+  document.getElementById('progressFill').style.width = `${(lesson.section / lesson.total_sections) * 100}%`;
+  document.getElementById('flagDisplay').className = 'flag-display';
+  document.getElementById('messages').innerHTML = '';
+
+  // Build phase nav
+  buildPhaseNav();
+
+  // Switch screens
+  showScreen('chatScreen');
+  document.getElementById('settingsBtn').style.display = 'none';
+  document.getElementById('endBtn').style.display = 'block';
+
+  // System message
+  addSystemMsg(`Session started — ${lesson.title}`);
+
+  // Trigger AI first message
+  callClaude([{ role: 'user', content: 'Begin the lesson now.' }]);
+}
+
+function buildPhaseNav() {
+  const nav = document.getElementById('phaseNav');
+  nav.innerHTML = '';
+  const phases = [...new Set((sectionData.teaching_path || []).map(n => n.phase).filter(Boolean))];
+  phases.forEach((phase, i) => {
+    const item = document.createElement('div');
+    item.className = `nav-item${i === 0 ? ' active' : ''}`;
+    item.id = `phase-${phase}`;
+    item.innerHTML = `<div class="nav-dot"></div><span>${phase.replace(/_/g, ' ')}</span>`;
+    nav.appendChild(item);
+  });
+}
+
+function endSession() {
+  showScreen('setupScreen');
+  document.getElementById('endBtn').style.display = 'none';
+  document.getElementById('settingsBtn').style.display = 'block';
+  conversationHistory = [];
+  sectionData = null;
+  document.getElementById('selectedFile').style.display = 'none';
+  document.getElementById('uploadZone').style.borderColor = '';
+  document.getElementById('startBtn').disabled = true;
+}
+
+function goToSetup() {
+  showScreen('setupScreen');
+}
+
+// ==================== CHAT ====================
+async function callClaude(messages) {
+  document.getElementById('sendBtn').disabled = true;
+  showTyping();
+
+  try {
+    // Get current session token
+    const { data: { session } } = await sbClient.auth.getSession();
+    if (!session) {
+      showToast('Session expired — please log in again');
+      logout();
+      return;
+    }
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/claude-proxy`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({
+        system: systemPrompt,
+        messages: messages
+      })
+    });
+
+    const data = await response.json();
+    removeTyping();
+
+    if (data.error) {
+      showToast('API Error: ' + data.error.message);
+      document.getElementById('sendBtn').disabled = false;
+      return;
+    }
+
+    let reply = data.content[0].text;
+
+    // Check if AI signals node completion
+    const nodeComplete = reply.includes('[NODE_COMPLETE]');
+    reply = reply.replace('[NODE_COMPLETE]', '').trim();
+
+    // Track teaching methods used
+    messageCount++;
+    const replyLower = reply.toLowerCase();
+    if ((replyLower.includes('think about') || replyLower.includes('what do you think') || replyLower.includes('what would you')) && !usedMethods.includes('socratic')) usedMethods.push('socratic');
+    if ((replyLower.includes('think of it like') || replyLower.includes('imagine') || replyLower.includes('like a ') || replyLower.includes('analogy')) && !usedMethods.includes('analogy')) usedMethods.push('analogy');
+    if ((replyLower.includes('remember it as') || replyLower.includes('memory anchor') || replyLower.includes('to remember this')) && !usedMethods.includes('memory_anchor')) usedMethods.push('memory_anchor');
+    if ((replyLower.includes('for example') || replyLower.includes('here is an example') || replyLower.includes('real world')) && !usedMethods.includes('real_world_example')) usedMethods.push('real_world_example');
+    if ((replyLower.includes('let me explain') || replyLower.includes('here is how') || replyLower.includes('the way this works')) && !usedMethods.includes('direct_explanation')) usedMethods.push('direct_explanation');
+    if ((replyLower.includes('scenario') || replyLower.includes('imagine you are') || replyLower.includes('suppose you')) && !usedMethods.includes('scenario')) usedMethods.push('scenario');
+    if ((replyLower.includes('correct') || replyLower.includes('exactly') || replyLower.includes('right —') || replyLower.includes('spot on')) && !usedMethods.includes('positive_reinforcement')) usedMethods.push('positive_reinforcement');
+
+    // Reset cycle when all methods used — keep cycling but shuffle order
+    const allMethods = ['socratic', 'analogy', 'memory_anchor', 'real_world_example', 'direct_explanation', 'scenario', 'positive_reinforcement'];
+    if (allMethods.every(m => usedMethods.includes(m))) {
+      usedMethods = ['positive_reinforcement']; // keep one to avoid starting same way
+    }
+
+    // Update history
+    const lastUserMsg = messages[messages.length - 1];
+    if (lastUserMsg.content !== 'Begin the lesson now.') {
+      conversationHistory.push(lastUserMsg);
+    }
+    conversationHistory.push({ role: 'assistant', content: reply });
+
+    addMessage('assistant', reply);
+
+    // Advance node if AI signaled completion
+    if (nodeComplete) {
+      setTimeout(() => advanceNode(), 800);
+    }
+
+    // Check for flag capture — only trigger on explicit AI confirmation in practice phase
+    if (sectionData?.lesson?.practice_flag) {
+      const flag = sectionData.lesson.practice_flag.toLowerCase();
+      const currentNode = sectionData.teaching_path[currentNodeIndex];
+      const inPracticePhase = currentNode?.phase === 'hands_on' || currentNode?.type === 'practice_transition';
+      // Only capture if in practice phase AND AI confirms correct answer
+      if (inPracticePhase && (
+        (reply.toLowerCase().includes('correct') && reply.toLowerCase().includes(flag)) ||
+        reply.toLowerCase().includes('[flag_captured]') ||
+        reply.toLowerCase().includes('flag captured')
+      )) {
+        document.getElementById('flagDisplay').className = 'flag-display captured';
+        document.getElementById('flagDisplay').textContent = `🏴 Flag: ${sectionData.lesson.practice_flag}`;
+      }
+    }
+
+  } catch(e) {
+    removeTyping();
+    showToast('Network error: ' + e.message);
+  }
+
+  document.getElementById('sendBtn').disabled = false;
+  document.getElementById('userInput').focus();
+}
+
+function sendMessage() {
+  const input = document.getElementById('userInput');
+  const text = input.value.trim();
+  if (!text || document.getElementById('sendBtn').disabled) return;
+
+  // Handle #flag submission command
+  if (text.toLowerCase().startsWith('#flag')) {
+    const submitted = text.replace(/#flag/i, '').trim();
+    const correct = sectionData?.lesson?.practice_flag;
+    if (correct && submitted.toLowerCase() === correct.toLowerCase()) {
+      addMessage('user', text);
+      addMessage('assistant', `✓ Correct! Flag captured: <code>${correct}</code>`);
+      document.getElementById('flagDisplay').className = 'flag-display captured';
+      document.getElementById('flagDisplay').textContent = `🏴 Flag: ${correct}`;
+      input.value = '';
+      input.style.height = 'auto';
+      return;
+    } else if (correct) {
+      addMessage('user', text);
+      addMessage('assistant', `✗ Incorrect. Try again.`);
+      input.value = '';
+      input.style.height = 'auto';
+      return;
+    }
+  }
+
+  addMessage('user', text);
+  input.value = '';
+  input.style.height = 'auto';
+
+  const messages = [...conversationHistory, { role: 'user', content: text }];
+  callClaude(messages);
+}
+
+function handleChatKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+// ==================== MESSAGE RENDERING ====================
+function addMessage(role, content) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+
+  const avatar = document.createElement('div');
+  avatar.className = 'msg-avatar';
+  avatar.textContent = role === 'assistant' ? 'AI' : 'YOU';
+
+  const contentDiv = document.createElement('div');
+  contentDiv.className = 'msg-content';
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.innerHTML = formatMessage(content);
+  contentDiv.appendChild(bubble);
+
+  div.appendChild(avatar);
+  div.appendChild(contentDiv);
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function addSystemMsg(text) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'system-msg';
+  div.textContent = `— ${text} —`;
+  msgs.appendChild(div);
+}
+
+function showTyping() {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg assistant';
+  div.id = 'typing-indicator';
+
+  const avatar = document.createElement('div');
+  avatar.className = 'msg-avatar';
+  avatar.textContent = 'AI';
+
+  const contentDiv = document.createElement('div');
+  contentDiv.className = 'msg-content';
+  const bubble = document.createElement('div');
+  bubble.className = 'typing-bubble';
+  bubble.innerHTML = '<div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>';
+  contentDiv.appendChild(bubble);
+
+  div.appendChild(avatar);
+  div.appendChild(contentDiv);
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function removeTyping() {
+  const t = document.getElementById('typing-indicator');
+  if (t) t.remove();
+}
+
+function formatMessage(text) {
+  return text
+    .replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => `<pre><code>${code.trim()}</code></pre>`)
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*\n]+)\*\*/g, '<strong style="font-size:14px;font-weight:700">$1</strong>')
+    .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+}
+
+// ==================== UI HELPERS ====================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function setStatus(online, label) {
+  const dot = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  dot.className = 'status-dot' + (online ? ' online' : '');
+  text.textContent = label;
+}
+
+function showToast(msg, success = false) {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.style.background = success ? 'var(--accent)' : 'var(--danger)';
+  toast.style.color = success ? '#000' : '#fff';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// ==================== BOOT ====================
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
