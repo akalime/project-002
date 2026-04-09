@@ -1099,6 +1099,229 @@ hr { border: none; border-top: 1px solid var(--border); }
 
 /* Scrollbar global */
 ::-webkit-scrollbar { width: 4px; }
+/* ===== SIM UI ===== */
+.sim-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(4px);
+}
+
+.sim-modal {
+  background: #1a1a2e;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 760px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 0 60px rgba(0,229,160,0.15);
+  animation: simIn 0.3s ease;
+}
+
+@keyframes simIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.sim-browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #0e0e1a;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sim-traffic-lights {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sim-light {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.sim-light.red { background: #ff5f57; }
+.sim-light.yellow { background: #febc2e; }
+.sim-light.green { background: #28c840; }
+
+.sim-url-bar {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sim-browser-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.sim-hint-btn, .sim-close-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid var(--border2);
+  background: transparent;
+  transition: all 0.2s;
+}
+
+.sim-hint-btn { color: var(--warn); border-color: var(--warn); }
+.sim-hint-btn:hover { background: rgba(255,190,0,0.1); }
+.sim-close-btn { color: var(--danger); border-color: var(--danger); }
+.sim-close-btn:hover { background: var(--danger-dim); }
+
+.sim-content {
+  flex: 1;
+  overflow-y: auto;
+  background: #f0f0f0;
+  color: #111;
+  min-height: 300px;
+}
+
+.sim-flag-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+.sim-flag-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.sim-flag-input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  outline: none;
+}
+
+.sim-flag-input:focus { border-color: var(--accent); }
+
+.sim-flag-submit {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sim-flag-submit:hover { filter: brightness(1.1); }
+
+.sim-hint-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.sim-hint-box {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 20px;
+  max-width: 340px;
+  width: 90%;
+}
+
+.sim-hint-header {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+}
+
+.sim-hint-text {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.sim-hint-close {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* Launch practice button in chat */
+.practice-launch-btn {
+  background: linear-gradient(135deg, var(--accent), #00b377);
+  color: #000;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 8px;
+  font-family: 'Bebas Neue', 'Arial Black', sans-serif;
+  font-size: 18px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  width: 100%;
+  margin: 8px 0;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 4px 20px rgba(0,229,160,0.3);
+  animation: launchPulse 2s ease-in-out infinite;
+}
+
+.practice-launch-btn:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 6px 30px rgba(0,229,160,0.5);
+}
+
+@keyframes launchPulse {
+  0%,100% { box-shadow: 0 4px 20px rgba(0,229,160,0.3); }
+  50% { box-shadow: 0 4px 30px rgba(0,229,160,0.6); }
+}
+
 /* ===== CLI BOTTOM SHEET ===== */
 .cli-sheet {
   position: fixed;
@@ -1515,6 +1738,50 @@ hr { border: none; border-top: 1px solid var(--border); }
     <div class="mobile-lesson-meta" id="mobileLessonMeta">—</div>
     <span class="mobile-flag" id="mobileFlagIcon"></span>
     <button class="mobile-end-btn" onclick="endSession()">✕ End</button>
+  </div>
+
+  <!-- Sim UI Modal -->
+  <div class="sim-overlay" id="simOverlay" style="display:none">
+    <div class="sim-modal" id="simModal">
+
+      <!-- Sim Browser Chrome -->
+      <div class="sim-browser-bar">
+        <div class="sim-traffic-lights">
+          <span class="sim-light red" onclick="closeSim()"></span>
+          <span class="sim-light yellow"></span>
+          <span class="sim-light green"></span>
+        </div>
+        <div class="sim-url-bar" id="simUrlBar">http://vuln-app.local/search</div>
+        <div class="sim-browser-actions">
+          <button class="sim-hint-btn" id="simHintBtn" onclick="requestSimHint()">💡 Hint</button>
+          <button class="sim-close-btn" onclick="closeSim()">✕ Exit</button>
+        </div>
+      </div>
+
+      <!-- Sim App Content -->
+      <div class="sim-content" id="simContent">
+        <!-- Populated by sim templates -->
+      </div>
+
+      <!-- Sim Flag Submit -->
+      <div class="sim-flag-bar" id="simFlagBar" style="display:none">
+        <span class="sim-flag-label">🏴 Submit Flag:</span>
+        <input type="text" class="sim-flag-input" id="simFlagInput" 
+          placeholder="Enter captured value..." 
+          onkeydown="if(event.key==='Enter') submitSimFlag()"/>
+        <button class="sim-flag-submit" onclick="submitSimFlag()">Submit</button>
+      </div>
+
+      <!-- Hint overlay -->
+      <div class="sim-hint-overlay" id="simHintOverlay" style="display:none">
+        <div class="sim-hint-box">
+          <div class="sim-hint-header">💡 Coach</div>
+          <div class="sim-hint-text" id="simHintText"></div>
+          <button class="sim-hint-close" onclick="closeSimHint()">Got it</button>
+        </div>
+      </div>
+
+    </div>
   </div>
 
   <!-- CLI Bottom Sheet -->
@@ -1942,6 +2209,8 @@ CRITICAL SEQUENCING RULES:
 3. When the learner has clearly mastered the current node, end your response with exactly: [NODE_COMPLETE]
 4. Never include content, examples, or attack scenarios from nodes you have not reached yet.
 5. If the learner asks about something in a future node, say "we will get to that" and redirect.
+6. When the current node type is "practice_transition" or "hands_on" AND the learner has demonstrated understanding of the concept — end your response with [LAUNCH_PRACTICE] to trigger the practice environment. Only do this once per session.
+7. If the learner asks to launch practice early, respond positively and include [LAUNCH_PRACTICE] in your response.
 
 TEACHING BALANCE — CRITICAL:
 - DO NOT use pure Socratic questioning. That feels like an interrogation, not a lesson.
@@ -2152,6 +2421,10 @@ async function callClaude(messages) {
     const nodeComplete = reply.includes('[NODE_COMPLETE]');
     reply = reply.replace('[NODE_COMPLETE]', '').trim();
 
+    // Check if AI signals practice ready
+    const launchPractice = reply.includes('[LAUNCH_PRACTICE]');
+    reply = reply.replace('[LAUNCH_PRACTICE]', '').trim();
+
     // Track teaching methods used
     messageCount++;
     const replyLower = reply.toLowerCase();
@@ -2191,6 +2464,11 @@ async function callClaude(messages) {
     // Advance node if AI signaled completion
     if (nodeComplete) {
       setTimeout(() => advanceNode(), 800);
+    }
+
+    // Show practice launch button if AI signals ready
+    if (launchPractice) {
+      setTimeout(() => addLaunchButton(), 400);
     }
 
     // Check for flag capture — only trigger on explicit AI confirmation in practice phase
@@ -2393,6 +2671,339 @@ function showToast(msg, success = false) {
   toast.textContent = msg;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
+}
+
+// ==================== SIM UI ====================
+let simActive = false;
+let simHintTimer = null;
+let currentSim = null;
+
+// Sim templates — each defines the fake app HTML and behavior
+const SIM_TEMPLATES = {
+
+  search_app: (config) => `
+    <div style="font-family: Arial, sans-serif; min-height: 100%;">
+      <!-- Fake navbar -->
+      <div style="background:#2c3e50;color:white;padding:10px 20px;display:flex;align-items:center;gap:16px;">
+        <span style="font-weight:700;font-size:16px;">🔍 VulnSearch</span>
+        <span style="font-size:12px;opacity:0.6;">v1.0 — Community Edition</span>
+        <span style="margin-left:auto;font-size:12px;opacity:0.6;">Welcome, guest</span>
+      </div>
+      <!-- Search form -->
+      <div style="padding:40px 20px;max-width:600px;margin:0 auto;">
+        <h2 style="color:#2c3e50;margin-bottom:20px;">Search Articles</h2>
+        <div style="display:flex;gap:8px;margin-bottom:20px;">
+          <input type="text" id="simSearchInput" 
+            placeholder="Search for articles..." 
+            style="flex:1;padding:10px 14px;border:2px solid #ddd;border-radius:4px;font-size:14px;outline:none;"
+            onfocus="this.style.borderColor='#3498db'"
+            onblur="this.style.borderColor='#ddd'"
+            onkeydown="if(event.key==='Enter')handleSimSearch()"/>
+          <button onclick="handleSimSearch()" 
+            style="background:#3498db;color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;font-size:14px;">
+            Search
+          </button>
+        </div>
+        <div id="simSearchResults" style="min-height:100px;"></div>
+      </div>
+      <!-- Page source hint -->
+      <div style="position:fixed;bottom:60px;right:12px;font-size:11px;color:#999;font-family:monospace;">
+        Tip: Right-click → View Page Source
+      </div>
+    </div>`,
+
+  login_form: (config) => `
+    <div style="font-family:Arial,sans-serif;background:#f5f5f5;min-height:100%;display:flex;align-items:center;justify-content:center;">
+      <div style="background:white;padding:40px;border-radius:8px;width:340px;box-shadow:0 2px 20px rgba(0,0,0,0.1);">
+        <h2 style="text-align:center;color:#333;margin-bottom:24px;">🔐 Admin Login</h2>
+        <div style="margin-bottom:16px;">
+          <label style="display:block;font-size:12px;color:#666;margin-bottom:6px;">Username</label>
+          <input type="text" id="simLoginUser" placeholder="Enter username"
+            style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px;box-sizing:border-box;outline:none;"/>
+        </div>
+        <div style="margin-bottom:20px;">
+          <label style="display:block;font-size:12px;color:#666;margin-bottom:6px;">Password</label>
+          <input type="password" id="simLoginPass" placeholder="Enter password"
+            style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px;box-sizing:border-box;outline:none;"
+            onkeydown="if(event.key==='Enter')handleSimLogin()"/>
+        </div>
+        <button onclick="handleSimLogin()"
+          style="width:100%;background:#e74c3c;color:white;border:none;padding:12px;border-radius:4px;font-size:14px;cursor:pointer;">
+          Login
+        </button>
+        <div id="simLoginResult" style="margin-top:16px;text-align:center;font-size:13px;"></div>
+        <div style="margin-top:16px;padding:10px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;font-size:11px;color:#856404;">
+          ⚠️ Default credentials in use — contact admin
+        </div>
+      </div>
+    </div>`,
+
+  comment_box: (config) => `
+    <div style="font-family:Arial,sans-serif;min-height:100%;">
+      <div style="background:#e74c3c;color:white;padding:12px 20px;">
+        <span style="font-weight:700;">📝 BlogPost — Community Comments</span>
+      </div>
+      <div style="padding:20px;max-width:640px;margin:0 auto;">
+        <div style="background:white;padding:20px;border-radius:6px;margin-bottom:20px;border:1px solid #eee;">
+          <h3 style="color:#333;">Article: Introduction to Web Security</h3>
+          <p style="color:#666;font-size:14px;">Web security is a critical aspect of modern application development...</p>
+        </div>
+        <h4 style="color:#333;margin-bottom:12px;">Leave a Comment</h4>
+        <textarea id="simCommentInput" rows="3" placeholder="Write your comment here..."
+          style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px;box-sizing:border-box;resize:vertical;"></textarea>
+        <button onclick="handleSimComment()"
+          style="margin-top:8px;background:#e74c3c;color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;">
+          Post Comment
+        </button>
+        <div id="simComments" style="margin-top:20px;"></div>
+      </div>
+    </div>`
+};
+
+// Sim interaction handlers
+function handleSimSearch() {
+  const input = document.getElementById('simSearchInput');
+  const results = document.getElementById('simSearchResults');
+  const query = input.value;
+  if (!query) return;
+
+  const sim = currentSim;
+  const cookie = sim?.config?.cookie || 'sessionid=abc123def456; username=admin';
+
+  // Check if payload is XSS
+  const hasScript = query.includes('<script') || query.includes('onerror=') || query.includes('onload=');
+
+  if (hasScript) {
+    // Simulate XSS execution
+    results.innerHTML = `
+      <div style="color:#e74c3c;padding:10px;background:#fff5f5;border:1px solid #e74c3c;border-radius:4px;margin-bottom:10px;">
+        Search results for: ${query}
+      </div>
+      <div style="padding:10px;color:#666;font-size:13px;">No results found.</div>`;
+
+    // Show fake alert popup
+    setTimeout(() => {
+      showSimAlert(`🚨 POPUP ALERT:
+
+${cookie}
+
+JavaScript executed successfully!`, cookie);
+    }, 600);
+  } else {
+    results.innerHTML = `
+      <div style="padding:10px;color:#333;font-size:13px;background:white;border:1px solid #eee;border-radius:4px;">
+        Search results for: <strong>${query}</strong><br>
+        <span style="color:#666;">No results found.</span>
+      </div>`;
+  }
+}
+
+function handleSimLogin() {
+  const user = document.getElementById('simLoginUser')?.value;
+  const pass = document.getElementById('simLoginPass')?.value;
+  const result = document.getElementById('simLoginResult');
+
+  const sim = currentSim;
+  const validUser = sim?.config?.username || 'admin';
+  const validPass = sim?.config?.password || 'password123';
+
+  if (user === validUser && pass === validPass) {
+    result.innerHTML = `<span style="color:green;">✓ Login successful! Redirecting...</span>`;
+    setTimeout(() => {
+      result.innerHTML = `<div style="color:green;padding:10px;background:#f0fff0;border:1px solid green;border-radius:4px;">
+        Welcome ${validUser}! Session token: ${sim?.config?.cookie || 'sessionid=abc123def456'}
+      </div>`;
+      document.getElementById('simFlagBar').style.display = 'flex';
+    }, 800);
+  } else if (user.includes("'") || user.includes('"') || user.includes('--')) {
+    // SQL injection simulation
+    result.innerHTML = `<div style="color:green;padding:10px;background:#f0fff0;border:1px solid green;border-radius:4px;">
+      ⚠️ SQL Error exposed — Login bypassed!<br>
+      Admin session: ${sim?.config?.cookie || 'sessionid=abc123def456'}
+    </div>`;
+    document.getElementById('simFlagBar').style.display = 'flex';
+  } else {
+    result.innerHTML = `<span style="color:#e74c3c;">✗ Invalid credentials</span>`;
+  }
+}
+
+function handleSimComment() {
+  const input = document.getElementById('simCommentInput');
+  const comments = document.getElementById('simComments');
+  const text = input.value;
+  if (!text) return;
+
+  const sim = currentSim;
+  const cookie = sim?.config?.cookie || 'sessionid=abc123def456';
+
+  const comment = document.createElement('div');
+  comment.style.cssText = 'background:white;padding:14px;border:1px solid #eee;border-radius:4px;margin-bottom:8px;';
+
+  const hasScript = text.includes('<script') || text.includes('onerror=') || text.includes('onload=');
+
+  if (hasScript) {
+    comment.innerHTML = `<strong style="color:#333;">Guest</strong> <span style="font-size:11px;color:#999;">just now</span><br>${text}`;
+    comments.appendChild(comment);
+    setTimeout(() => {
+      showSimAlert(`🚨 Stored XSS Executed!
+
+Cookie stolen: ${cookie}`, cookie);
+    }, 600);
+  } else {
+    comment.innerHTML = `<strong style="color:#333;">Guest</strong> <span style="font-size:11px;color:#999;">just now</span><br><span style="font-size:14px;color:#444;">${text}</span>`;
+    comments.appendChild(comment);
+  }
+
+  input.value = '';
+}
+
+function showSimAlert(message, flagValue) {
+  // Create fake browser alert popup
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;';
+
+  const alertBox = document.createElement('div');
+  alertBox.style.cssText = 'background:white;border:2px solid #333;border-radius:4px;width:380px;font-family:Arial,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,0.4);';
+  alertBox.innerHTML = `
+    <div style="background:#f0f0f0;padding:8px 14px;border-bottom:1px solid #ccc;font-size:12px;color:#333;display:flex;align-items:center;gap:8px;">
+      <span>⚠️</span> <strong>This page says</strong>
+    </div>
+    <div style="padding:20px;white-space:pre-wrap;font-size:13px;color:#333;line-height:1.6;">${message}</div>
+    <div style="padding:10px 20px;text-align:right;border-top:1px solid #eee;">
+      <button onclick="this.closest('[style*=fixed]').remove();document.getElementById('simFlagBar').style.display='flex';"
+        style="background:#0078d4;color:white;border:none;padding:6px 20px;border-radius:3px;cursor:pointer;font-size:13px;">OK</button>
+    </div>`;
+
+  overlay.appendChild(alertBox);
+  document.getElementById('simModal').appendChild(overlay);
+}
+
+function addLaunchButton() {
+  const msgs = document.getElementById('messages');
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'padding: 4px 0; max-width: 480px; width: 100%;';
+
+  const btn = document.createElement('button');
+  btn.className = 'practice-launch-btn';
+  btn.innerHTML = '⚡ Launch Practice Environment →';
+  btn.onclick = () => {
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    openSim();
+  };
+
+  wrap.appendChild(btn);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function openSim() {
+  if (!sectionData?.simulation) {
+    showToast('No simulation defined for this section');
+    return;
+  }
+
+  const sim = sectionData.simulation;
+  currentSim = sim;
+
+  // Set URL bar
+  document.getElementById('simUrlBar').textContent = sim.url || 'http://vuln-app.local/';
+
+  // Render template
+  const template = SIM_TEMPLATES[sim.template];
+  if (!template) {
+    showToast('Unknown sim template: ' + sim.template);
+    return;
+  }
+
+  document.getElementById('simContent').innerHTML = template(sim.config || {});
+  document.getElementById('simOverlay').style.display = 'flex';
+  simActive = true;
+
+  // Start hint timer
+  clearTimeout(simHintTimer);
+  simHintTimer = setTimeout(() => {
+    document.getElementById('simHintBtn').style.animation = 'voicePulse 1s ease-in-out infinite';
+  }, 30000);
+}
+
+function closeSim() {
+  document.getElementById('simOverlay').style.display = 'none';
+  simActive = false;
+  currentSim = null;
+  clearTimeout(simHintTimer);
+
+  // Notify AI session resumed
+  addSystemMsg('Practice environment closed — returning to lesson');
+}
+
+async function requestSimHint() {
+  const hintOverlay = document.getElementById('simHintOverlay');
+  const hintText = document.getElementById('simHintText');
+
+  hintText.textContent = 'Getting hint...';
+  hintOverlay.style.display = 'flex';
+
+  try {
+    const { data: { session } } = await sbClient.auth.getSession();
+    if (!session) return;
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/claude-proxy`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({
+        system: systemPrompt,
+        messages: [
+          ...conversationHistory.slice(-4),
+          { role: 'user', content: 'I need a hint for the current practice challenge. Give me ONE short hint that guides me without giving away the answer.' }
+        ]
+      })
+    });
+
+    const data = await response.json();
+    if (data.content?.[0]?.text) {
+      hintText.textContent = data.content[0].text;
+    }
+  } catch(e) {
+    hintText.textContent = 'Could not load hint. Try thinking about what the lesson taught.';
+  }
+}
+
+function closeSimHint() {
+  document.getElementById('simHintOverlay').style.display = 'none';
+}
+
+function submitSimFlag() {
+  const input = document.getElementById('simFlagInput');
+  const submitted = input.value.trim();
+  const correct = sectionData?.simulation?.flag || sectionData?.lesson?.practice_flag;
+
+  if (!correct) { showToast('No flag defined for this sim'); return; }
+
+  if (submitted.toLowerCase() === correct.toLowerCase() || 
+      correct.toLowerCase().includes(submitted.toLowerCase()) && submitted.length > 5) {
+    // Flag captured
+    closeSim();
+    addMessage('assistant', `🏴 **Flag captured!** \`${submitted}\`
+
+You successfully exploited the vulnerability. Let's debrief what just happened.`);
+    document.getElementById('flagDisplay').className = 'flag-display captured';
+    document.getElementById('flagDisplay').textContent = `🏴 Flag: ${submitted}`;
+    markFlagCaptured();
+
+    // Tell AI flag was captured
+    const capMsg = `The learner just captured the flag in the practice sim: "${submitted}". Debrief them on what they did, why it worked, and what the real-world impact would be.`;
+    conversationHistory.push({ role: 'user', content: capMsg });
+    callClaude([...conversationHistory]);
+  } else {
+    showToast('Incorrect flag — keep trying');
+    input.style.borderColor = 'var(--danger)';
+    setTimeout(() => input.style.borderColor = '', 1500);
+  }
 }
 
 // ==================== CLI ====================
