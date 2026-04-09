@@ -756,6 +756,35 @@ input:focus {
 .send-btn:hover { filter: brightness(1.1); box-shadow: 0 0 16px var(--accent-glow); }
 .send-btn:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; }
 
+.voice-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.voice-btn:hover { border-color: var(--accent); }
+.voice-btn.listening {
+  background: var(--danger);
+  border-color: var(--danger);
+  animation: voicePulse 1s ease-in-out infinite;
+}
+.voice-btn.speaking {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  animation: voicePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes voicePulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
 /* Special message types */
 .system-msg {
   font-family: 'JetBrains Mono', monospace;
@@ -1093,6 +1122,7 @@ hr { border: none; border-top: 1px solid var(--border); }
           oninput="autoResize(this)"></textarea>
       </div>
       <button class="send-btn" id="sendBtn" onclick="sendMessage()">↑</button>
+      <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()" title="Hold to speak">🎤</button>
     </div>
   </div>
 </div>
@@ -1704,6 +1734,9 @@ async function callClaude(messages) {
 
     addMessage('assistant', reply);
 
+    // Auto-speak response if voice was used recently
+    if (voiceEnabled) speakResponse(reply);
+
     // Persist messages
     const persistUserMsg = conversationHistory[conversationHistory.length - 2];
     if (persistUserMsg && persistUserMsg.role === 'user' && persistUserMsg.content !== 'Begin the lesson now.') {
@@ -1916,6 +1949,137 @@ function showToast(msg, success = false) {
   toast.textContent = msg;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
+}
+
+// ==================== VOICE ====================
+let recognition = null;
+let speechSynth = window.speechSynthesis;
+let isListening = false;
+let isSpeaking = false;
+let voiceEnabled = false;
+
+function initVoice() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showToast('Voice not supported in this browser');
+    return false;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onstart = () => {
+    isListening = true;
+    document.getElementById('voiceBtn').className = 'voice-btn listening';
+    document.getElementById('voiceBtn').textContent = '🔴';
+    document.getElementById('userInput').placeholder = 'Listening...';
+  };
+
+  recognition.onresult = (e) => {
+    const transcript = Array.from(e.results)
+      .map(r => r[0].transcript)
+      .join('');
+
+    document.getElementById('userInput').value = transcript;
+
+    if (e.results[e.results.length - 1].isFinal) {
+      stopListening();
+      setTimeout(() => sendMessage(), 300);
+    }
+  };
+
+  recognition.onerror = (e) => {
+    stopListening();
+    if (e.error !== 'no-speech') showToast('Voice error: ' + e.error);
+  };
+
+  recognition.onend = () => {
+    stopListening();
+  };
+
+  return true;
+}
+
+function stopListening() {
+  isListening = false;
+  const btn = document.getElementById('voiceBtn');
+  btn.className = 'voice-btn';
+  btn.textContent = '🎤';
+  document.getElementById('userInput').placeholder = 'Type your answer... (Enter to send, Shift+Enter for newline)';
+}
+
+function toggleVoice() {
+  voiceEnabled = true;
+  if (isSpeaking) {
+    speechSynth.cancel();
+    isSpeaking = false;
+    document.getElementById('voiceBtn').className = 'voice-btn';
+    document.getElementById('voiceBtn').textContent = '🎤';
+    return;
+  }
+
+  if (isListening) {
+    recognition?.stop();
+    return;
+  }
+
+  if (!recognition && !initVoice()) return;
+  recognition.start();
+}
+
+function speakResponse(text) {
+  if (!speechSynth) return;
+
+  // Strip markdown for speech
+  const clean = text
+    .replace(/```[\s\S]*?```/g, 'code block')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\[NODE_COMPLETE\]/g, '')
+    .replace(/<[^>]+>/g, '')
+    .trim();
+
+  if (!clean) return;
+
+  speechSynth.cancel();
+  const utterance = new SpeechSynthesisUtterance(clean);
+  utterance.rate = 1.0;
+  utterance.pitch = 1.0;
+  utterance.volume = 1.0;
+
+  // Try to use a natural voice
+  const voices = speechSynth.getVoices();
+  const preferred = voices.find(v =>
+    v.name.includes('Google') ||
+    v.name.includes('Samantha') ||
+    v.name.includes('Daniel') ||
+    (v.lang === 'en-US' && v.localService)
+  );
+  if (preferred) utterance.voice = preferred;
+
+  utterance.onstart = () => {
+    isSpeaking = true;
+    document.getElementById('voiceBtn').className = 'voice-btn speaking';
+    document.getElementById('voiceBtn').textContent = '🔊';
+  };
+
+  utterance.onend = () => {
+    isSpeaking = false;
+    document.getElementById('voiceBtn').className = 'voice-btn';
+    document.getElementById('voiceBtn').textContent = '🎤';
+  };
+
+  utterance.onerror = () => {
+    isSpeaking = false;
+    document.getElementById('voiceBtn').className = 'voice-btn';
+    document.getElementById('voiceBtn').textContent = '🎤';
+  };
+
+  speechSynth.speak(utterance);
 }
 
 // ==================== BOOT ====================
