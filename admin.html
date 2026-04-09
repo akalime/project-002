@@ -987,6 +987,90 @@ body {
 .auth-btn:hover { filter: brightness(1.1); }
 .auth-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* ===== MOBILE ===== */
+@media (max-width: 768px) {
+  .topbar-nav {
+    overflow-x: auto;
+    gap: 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .topbar-btn { font-size: 10px; padding: 4px 8px; white-space: nowrap; }
+  .topbar-logo { font-size: 14px; }
+  .topbar-badge { display: none; }
+
+  .file-browser {
+    position: fixed;
+    left: -100%;
+    top: 48px;
+    bottom: 0;
+    z-index: 100;
+    width: 80vw;
+    max-width: 300px;
+    transition: left 0.25s ease;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+  }
+  .file-browser.open { left: 0; }
+
+  .fb-toggle {
+    display: flex !important;
+  }
+
+  .sessions-list {
+    position: fixed;
+    left: -100%;
+    top: 48px;
+    bottom: 0;
+    z-index: 100;
+    width: 80vw;
+    max-width: 300px;
+    transition: left 0.25s ease;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+    background: var(--bg);
+  }
+  .sessions-list.open { left: 0; }
+
+  .test-sidebar {
+    position: fixed;
+    left: -100%;
+    top: 48px;
+    bottom: 0;
+    z-index: 100;
+    width: 80vw;
+    max-width: 300px;
+    transition: left 0.25s ease;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+  }
+  .test-sidebar.open { left: 0; }
+
+  .rules-sidebar {
+    position: fixed;
+    left: -100%;
+    top: 48px;
+    bottom: 0;
+    z-index: 100;
+    width: 80vw;
+    max-width: 300px;
+    transition: left 0.25s ease;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+  }
+  .rules-sidebar.open { left: 0; }
+
+  .mobile-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 99;
+    top: 48px;
+  }
+  .mobile-overlay.open { display: block; }
+
+  .editor-btn { font-size: 10px; padding: 3px 8px; }
+  .editor-topbar { gap: 6px; overflow-x: auto; }
+}
+
+.fb-toggle { display: none; }
+
 /* ===== SCROLLBARS ===== */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -1033,6 +1117,7 @@ body {
 
   <!-- Top Bar -->
   <div class="topbar">
+    <button class="fb-toggle" onclick="toggleSidebar()" style="background:transparent;border:1px solid var(--border2);color:var(--text-dim);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:16px;margin-right:4px;">☰</button>
     <div class="topbar-logo">P002</div>
     <div class="topbar-badge">ADMIN</div>
     <div class="topbar-nav">
@@ -1063,6 +1148,7 @@ body {
           <div class="fb-actions">
             <button class="fb-btn" onclick="refreshFiles()" title="Refresh">↻</button>
             <button class="fb-btn" onclick="showNewFileModal()" title="New file">+</button>
+            <button class="fb-btn fb-toggle" onclick="toggleSidebar()" title="Close">✕</button>
           </div>
         </div>
         <div class="fb-tree" id="fileTree">
@@ -1288,6 +1374,9 @@ body {
     </div>
   </div>
 </div>
+
+<!-- Mobile overlay -->
+<div class="mobile-overlay" id="mobileOverlay" onclick="closeSidebar()"></div>
 
 <script>
 // ==================== CONFIG ====================
@@ -2081,6 +2170,39 @@ function toast(msg, type = 'ok') {
   el.textContent = msg;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 3000);
+}
+
+// ==================== MOBILE SIDEBAR ====================
+function toggleSidebar() {
+  const sidebars = [
+    document.querySelector('.file-browser'),
+    document.querySelector('.sessions-list'),
+    document.querySelector('.test-sidebar'),
+    document.querySelector('.rules-sidebar')
+  ].filter(Boolean);
+
+  const overlay = document.getElementById('mobileOverlay');
+  const isOpen = sidebars.some(s => s.classList.contains('open'));
+
+  if (isOpen) {
+    sidebars.forEach(s => s.classList.remove('open'));
+    overlay.classList.remove('open');
+  } else {
+    // Open the sidebar for the current panel
+    const activePanel = document.querySelector('.panel.active');
+    if (activePanel) {
+      const sidebar = activePanel.querySelector('.file-browser, .sessions-list, .test-sidebar, .rules-sidebar');
+      if (sidebar) {
+        sidebar.classList.add('open');
+        overlay.classList.add('open');
+      }
+    }
+  }
+}
+
+function closeSidebar() {
+  document.querySelectorAll('.file-browser, .sessions-list, .test-sidebar, .rules-sidebar').forEach(s => s.classList.remove('open'));
+  document.getElementById('mobileOverlay').classList.remove('open');
 }
 
 // ==================== BOOT ====================
