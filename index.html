@@ -75,7 +75,7 @@ body::after {
 }
 
 .logo {
-  font-family: 'Bebas Neue', cursive;
+  font-family: 'Bebas Neue', 'Arial Black', 'Impact', sans-serif;
   font-size: 22px;
   letter-spacing: 4px;
   color: var(--accent);
@@ -142,7 +142,7 @@ body::after {
 }
 
 .auth-title {
-  font-family: 'Bebas Neue', cursive;
+  font-family: 'Bebas Neue', 'Arial Black', 'Impact', sans-serif;
   font-size: 72px;
   letter-spacing: 8px;
   line-height: 1;
@@ -271,7 +271,7 @@ input:focus {
 }
 
 .setup-title {
-  font-family: 'Bebas Neue', cursive;
+  font-family: 'Bebas Neue', 'Arial Black', 'Impact', sans-serif;
   font-size: 42px;
   letter-spacing: 4px;
   color: var(--text);
@@ -381,7 +381,7 @@ input:focus {
 .section-card.selected { border-color: var(--accent); background: var(--accent-dim); }
 
 .sec-num {
-  font-family: 'Bebas Neue', cursive;
+  font-family: 'Bebas Neue', 'Arial Black', 'Impact', sans-serif;
   font-size: 22px;
   color: var(--accent);
   letter-spacing: 1px;
@@ -585,7 +585,7 @@ input:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Bebas Neue', cursive;
+  font-family: 'Bebas Neue', 'Arial Black', 'Impact', sans-serif;
   font-size: 13px;
   letter-spacing: 1px;
   flex-shrink: 0;
@@ -817,7 +817,7 @@ input:focus {
 }
 
 .loading-logo {
-  font-family: 'Bebas Neue', cursive;
+  font-family: 'Bebas Neue', 'Arial Black', 'Impact', sans-serif;
   font-size: 64px;
   letter-spacing: 8px;
   color: var(--accent);
@@ -857,6 +857,101 @@ hr { border: none; border-top: 1px solid var(--border); }
 
 /* Scrollbar global */
 ::-webkit-scrollbar { width: 4px; }
+/* ===== MOBILE ===== */
+@media (max-width: 768px) {
+  /* Hide sidebar on mobile */
+  .chat-sidebar { display: none; }
+
+  /* Full width chat */
+  #chatScreen { flex-direction: column; }
+  .chat-main { width: 100%; }
+
+  /* Mobile header */
+  .header { padding: 0 16px; height: 48px; }
+  .logo { font-size: 18px; letter-spacing: 2px; }
+
+  /* Compact setup screen */
+  #setupScreen { padding: 20px 16px; gap: 16px; }
+  .setup-title { font-size: 28px; }
+  .setup-card { padding: 20px; }
+
+  /* Auth screen */
+  #authScreen { padding: 24px 16px; gap: 20px; }
+  .auth-title { font-size: 48px; letter-spacing: 4px; }
+  .auth-card { padding: 24px 20px; }
+
+  /* Messages */
+  .messages { padding: 12px 14px; gap: 10px; }
+  .msg { max-width: 100%; }
+  .msg-bubble { font-size: 14px; padding: 10px 14px; }
+  .msg.user { max-width: 88%; }
+  .msg.assistant { max-width: 100%; }
+
+  /* Input area */
+  .input-area { padding: 10px 12px; gap: 8px; }
+  .chat-textarea { min-height: 40px; }
+  .send-btn { width: 40px; height: 40px; font-size: 16px; }
+
+  /* Mobile top bar for lesson info */
+  .mobile-lesson-bar {
+    display: flex;
+    align-items: center;
+    padding: 8px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .mobile-lesson-title {
+    font-weight: 700;
+    color: var(--text);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-lesson-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .mobile-flag {
+    font-size: 14px;
+  }
+
+  /* Hide desktop-only elements */
+  .header-btn { display: none; }
+
+  /* Mobile end session button */
+  .mobile-end-btn {
+    display: flex;
+    background: transparent;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+}
+
+/* Show mobile bar only on mobile */
+.mobile-lesson-bar { display: none; }
+
+@media (max-width: 768px) {
+  .mobile-lesson-bar { display: flex; }
+  #endBtn { display: none !important; }
+  #settingsBtn { display: none !important; }
+  #logoutBtn { display: flex !important; font-size: 10px; padding: 4px 10px; }
+}
+
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
 </style>
@@ -977,6 +1072,14 @@ hr { border: none; border-top: 1px solid var(--border); }
     <div class="sidebar-footer">
       <div class="flag-display" id="flagDisplay">🏴 Flag Captured</div>
     </div>
+  </div>
+
+  <!-- Mobile lesson bar -->
+  <div class="mobile-lesson-bar" id="mobileLessonBar" style="display:none">
+    <div class="mobile-lesson-title" id="mobileLessonTitle">—</div>
+    <div class="mobile-lesson-meta" id="mobileLessonMeta">—</div>
+    <span class="mobile-flag" id="mobileFlagIcon"></span>
+    <button class="mobile-end-btn" onclick="endSession()">✕ End</button>
   </div>
 
   <!-- Chat Main -->
@@ -1433,6 +1536,10 @@ async function startSession() {
   const lesson = sectionData.lesson;
   document.getElementById('lessonTitle').textContent = lesson.title;
   document.getElementById('lessonMeta').textContent = `Section ${lesson.section} of ${lesson.total_sections}`;
+  // Mobile bar
+  document.getElementById('mobileLessonTitle').textContent = lesson.title;
+  document.getElementById('mobileLessonMeta').textContent = `${lesson.section}/${lesson.total_sections}`;
+  document.getElementById('mobileLessonBar').style.display = '';
   document.getElementById('progressFill').style.width = `${(lesson.section / lesson.total_sections) * 100}%`;
   document.getElementById('flagDisplay').className = 'flag-display';
   document.getElementById('messages').innerHTML = '';
@@ -1512,6 +1619,19 @@ function goToSetup() {
   showScreen('setupScreen');
 }
 
+// ==================== PROMPT SIGNING ====================
+// PROMPT_SECRET must match the server-side secret in Edge Function env
+const PROMPT_SECRET = 'REPLACE_WITH_YOUR_PROMPT_SECRET';
+
+async function signPrompt(prompt) {
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(PROMPT_SECRET);
+  const msgData = encoder.encode(prompt);
+  const key = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, msgData);
+  return btoa(String.fromCharCode(...new Uint8Array(sig)));
+}
+
 // ==================== CHAT ====================
 async function callClaude(messages) {
   document.getElementById('sendBtn').disabled = true;
@@ -1526,6 +1646,9 @@ async function callClaude(messages) {
       return;
     }
 
+    // Sign the system prompt
+    const sig = await signPrompt(systemPrompt);
+
     const response = await fetch(`${SUPABASE_URL}/functions/v1/claude-proxy`, {
       method: 'POST',
       headers: {
@@ -1534,9 +1657,8 @@ async function callClaude(messages) {
         'apikey': SUPABASE_ANON_KEY
       },
       body: JSON.stringify({
-        section_id: sectionData?.lesson?.section,
-        module: sectionData?.lesson?.module,
-        node_index: currentNodeIndex,
+        system: systemPrompt,
+        system_sig: sig,
         messages: messages
       })
     });
@@ -1607,6 +1729,7 @@ async function callClaude(messages) {
       )) {
         document.getElementById('flagDisplay').className = 'flag-display captured';
         document.getElementById('flagDisplay').textContent = `🏴 Flag: ${sectionData.lesson.practice_flag}`;
+        document.getElementById('mobileFlagIcon').textContent = '🏴';
         markFlagCaptured();
       }
     }
