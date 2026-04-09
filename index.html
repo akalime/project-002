@@ -1840,7 +1840,19 @@ hr { border: none; border-top: 1px solid var(--border); }
 const SUPABASE_URL = 'https://obobtgryhcrptcyaukvw.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ib2J0Z3J5aGNycHRjeWF1a3Z3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3MTUxMzQsImV4cCI6MjA5MTI5MTEzNH0.o3Rq3VqTN6uWzX4Uqfqd8VpH2wlS5PmoDvtRQOMc9EU';
 
-const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    storage: window.localStorage,
+    storageKey: 'sb-obobtgryhcrptcyaukvw-auth-token',
+    flowType: 'implicit',
+    detectSessionInUrl: false,
+    persistSession: true,
+    autoRefreshToken: true,
+    lock: {
+      acquireTimeout: 10000
+    }
+  }
+});
 
 // ==================== STATE ====================
 let currentUser = null;
