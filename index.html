@@ -1232,6 +1232,75 @@ function checkStartReady() {
 // ==================== SESSION ====================
 // Node tracking
 let currentNodeIndex = 0;
+let currentSessionId = null;
+
+// ==================== PERSISTENCE ====================
+async function createSession() {
+  const { data: { user } } = await sbClient.auth.getUser();
+  if (!user || !sectionData) return null;
+
+  const { data, error } = await sbClient
+    .from('sessions')
+    .insert({
+      user_id: user.id,
+      section_number: sectionData.lesson.section,
+      module: sectionData.lesson.module
+    })
+    .select()
+    .single();
+
+  if (error) { console.error('Session create error:', error); return null; }
+  return data.id;
+}
+
+async function saveMessage(role, content) {
+  if (!currentSessionId) return;
+  await sbClient.from('session_messages').insert({
+    session_id: currentSessionId,
+    role,
+    content
+  });
+}
+
+async function loadLastSession(sectionNumber, module) {
+  const { data, error } = await sbClient
+    .from('sessions')
+    .select('id, section_number, flag_captured, started_at')
+    .eq('section_number', sectionNumber)
+    .eq('module', module)
+    .is('completed_at', null)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error || !data) return null;
+  return data;
+}
+
+async function loadSessionMessages(sessionId) {
+  const { data, error } = await sbClient
+    .from('session_messages')
+    .select('role, content, created_at')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: true });
+
+  if (error) return [];
+  return data;
+}
+
+async function markSessionComplete() {
+  if (!currentSessionId) return;
+  await sbClient.from('sessions').update({
+    completed_at: new Date().toISOString()
+  }).eq('id', currentSessionId);
+}
+
+async function markFlagCaptured() {
+  if (!currentSessionId) return;
+  await sbClient.from('sessions').update({
+    flag_captured: true
+  }).eq('id', currentSessionId);
+}
   usedMethods = [];
   messageCount = 0;
 
@@ -1344,7 +1413,7 @@ function getRelevantDatasets(data, node) {
   return Object.keys(result).length > 0 ? result : null;
 }
 
-function startSession() {
+async function startSession() {
   if (!sectionData) return;
 
   systemPrompt = buildSystemPrompt(sectionData);
@@ -1370,7 +1439,37 @@ function startSession() {
   document.getElementById('settingsBtn').style.display = 'none';
   document.getElementById('endBtn').style.display = 'block';
 
-  // System message
+  // Check for existing session
+  const lastSession = await loadLastSession(lesson.section, lesson.module);
+
+  if (lastSession) {
+    const messages = await loadSessionMessages(lastSession.id);
+    if (messages.length > 0) {
+      // Resume existing session
+      currentSessionId = lastSession.id;
+      addSystemMsg(`Resuming session — ${lesson.title}`);
+
+      // Restore conversation history
+      messages.forEach(msg => {
+        conversationHistory.push({ role: msg.role, content: msg.content });
+        addMessage(msg.role, msg.content);
+      });
+
+      // Flag if previously captured
+      if (lastSession.flag_captured) {
+        document.getElementById('flagDisplay').className = 'flag-display captured';
+        document.getElementById('flagDisplay').textContent = `🏴 Flag: ${sectionData.lesson.practice_flag}`;
+      }
+
+      addSystemMsg('Session resumed — continue where you left off');
+      document.getElementById('sendBtn').disabled = false;
+      document.getElementById('userInput').focus();
+      return;
+    }
+  }
+
+  // Create new session
+  currentSessionId = await createSession();
   addSystemMsg(`Session started — ${lesson.title}`);
 
   // Trigger AI first message
@@ -1390,14 +1489,16 @@ function buildPhaseNav() {
   });
 }
 
-function endSession() {
+async function endSession() {
+  await markSessionComplete();
+  currentSessionId = null;
   showScreen('setupScreen');
   document.getElementById('endBtn').style.display = 'none';
   document.getElementById('settingsBtn').style.display = 'block';
   conversationHistory = [];
   sectionData = null;
+  currentNodeIndex = 0;
   document.getElementById('selectedFile').style.display = 'none';
-  document.getElementById('uploadZone').style.borderColor = '';
   document.getElementById('startBtn').disabled = true;
 }
 
@@ -1473,6 +1574,13 @@ async function callClaude(messages) {
 
     addMessage('assistant', reply);
 
+    // Persist messages
+    const persistUserMsg = conversationHistory[conversationHistory.length - 2];
+    if (persistUserMsg && persistUserMsg.role === 'user' && persistUserMsg.content !== 'Begin the lesson now.') {
+      await saveMessage('user', persistUserMsg.content);
+    }
+    await saveMessage('assistant', reply);
+
     // Advance node if AI signaled completion
     if (nodeComplete) {
       setTimeout(() => advanceNode(), 800);
@@ -1491,6 +1599,7 @@ async function callClaude(messages) {
       )) {
         document.getElementById('flagDisplay').className = 'flag-display captured';
         document.getElementById('flagDisplay').textContent = `🏴 Flag: ${sectionData.lesson.practice_flag}`;
+        markFlagCaptured();
       }
     }
 
@@ -1609,13 +1718,50 @@ function removeTyping() {
 }
 
 function formatMessage(text) {
-  return text
-    .replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => `<pre><code>${code.trim()}</code></pre>`)
-    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*\n]+)\*\*/g, '<strong style="font-size:14px;font-weight:700">$1</strong>')
+  // Step 1: Extract code blocks before escaping so we can preserve them
+  const codeBlocks = [];
+  text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    const idx = codeBlocks.length;
+    codeBlocks.push(`<pre><code>${escapeHtml(code.trim())}</code></pre>`);
+    return `%%CODEBLOCK${idx}%%`;
+  });
+
+  // Step 2: Extract inline code
+  const inlineCode = [];
+  text = text.replace(/`([^`\n]+)`/g, (_, code) => {
+    const idx = inlineCode.length;
+    inlineCode.push(`<code>${escapeHtml(code)}</code>`);
+    return `%%INLINE${idx}%%`;
+  });
+
+  // Step 3: Escape HTML in remaining text
+  text = escapeHtml(text);
+
+  // Step 4: Apply markdown formatting on escaped text
+  text = text
+    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
     .replace(/\n\n/g, '<br><br>')
     .replace(/\n/g, '<br>');
+
+  // Step 5: Restore code blocks
+  codeBlocks.forEach((block, idx) => {
+    text = text.replace(`%%CODEBLOCK${idx}%%`, block);
+  });
+  inlineCode.forEach((code, idx) => {
+    text = text.replace(`%%INLINE${idx}%%`, code);
+  });
+
+  return text;
+}
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ==================== UI HELPERS ====================
