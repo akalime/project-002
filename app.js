@@ -31,6 +31,13 @@ window.P002App = (() => {
   // Challenge state
   let currentHintIndex = 0;
 
+  // Knowledge check state
+  let kcQuestions = [];
+  let kcCurrentIdx = 0;
+  let kcScore = 0;
+  let kcAnswers = [];         // {correct: bool, type: string} per question
+  let kcExplainHistory = [];
+
   // ==================== INIT ====================
   async function init() {
     try {
@@ -346,6 +353,27 @@ window.P002App = (() => {
 
     initTextSelection();
 
+    // Sticky next bar — show when reader hits bottom
+    const readerContent = document.getElementById('readerContent');
+    const stickyBar = document.getElementById('readerStickyNext');
+    if (stickyBar) stickyBar.style.display = 'none';
+    if (readerContent) {
+      readerScrollHandler = () => {
+        const nearBottom = readerContent.scrollTop + readerContent.clientHeight >= readerContent.scrollHeight - 60;
+        if (stickyBar) stickyBar.style.display = nearBottom ? 'flex' : 'none';
+        // Update progress fill
+        const pct = readerContent.scrollHeight <= readerContent.clientHeight ? 100 :
+          Math.min(100, Math.round((readerContent.scrollTop / (readerContent.scrollHeight - readerContent.clientHeight)) * 100));
+        document.getElementById('readerProgressFill').style.width = pct + '%';
+      };
+      readerContent.addEventListener('scroll', readerScrollHandler);
+    }
+
+    // Populate sticky next bar title
+    const nextMeta = currentModule?.sections?.[currentModule.sections.indexOf(currentSectionMeta) + 1];
+    const nextTitle = document.getElementById('stickyNextTitle');
+    if (nextTitle) nextTitle.textContent = nextMeta?.title || 'Module complete';
+
     // Create session for progress tracking
     try {
       currentSessionId = await P002Api.createSession(meta.section, meta.module);
@@ -357,12 +385,320 @@ window.P002App = (() => {
   function endReading() {
     removeTextSelectionHandler();
     closeDrawer();
+    // Remove scroll handler
+    const readerContent = document.getElementById('readerContent');
+    if (readerContent && readerScrollHandler) {
+      readerContent.removeEventListener('scroll', readerScrollHandler);
+      readerScrollHandler = null;
+    }
+    const stickyBar = document.getElementById('readerStickyNext');
+    if (stickyBar) stickyBar.style.display = 'none';
     document.getElementById('endBtn').style.display = 'none';
     document.getElementById('settingsBtn').style.display = 'block';
     showScreen('sectionScreen');
   }
 
-  // ==================== READER CONTENT RENDERER ====================
+  // ==================== STICKY NEXT BAR ====================
+  function stickyNextTapped() {
+    // If knowledge_check exists, go to KC prompt screen
+    // Otherwise go straight to next section
+    const kcData = sectionData?.knowledge_check;
+    if (kcData?.questions?.length > 0) {
+      showKcPrompt();
+    } else {
+      goToNextSection();
+    }
+  }
+
+  function showKcPrompt() {
+    const kcData = sectionData.knowledge_check;
+    const qCount = kcData.questions.length;
+    document.getElementById('kcPromptCount').textContent = qCount + ' question' + (qCount !== 1 ? 's' : '') + ' · ~' + Math.ceil(qCount * 0.5) + ' min';
+    showScreen('kcPromptScreen');
+  }
+
+  function skipKcGoNext() {
+    goToNextSection();
+  }
+
+  function goToNextSection() {
+    if (!currentModule || !currentSectionMeta) { showScreen('moduleScreen'); return; }
+    const sections = currentModule.sections;
+    const idx = sections.findIndex(s => s.file === currentSectionMeta.file);
+    if (idx === -1 || idx >= sections.length - 1) {
+      showScreen('moduleScreen');
+      return;
+    }
+    const nextMeta = sections[idx + 1];
+    openSectionPreview(nextMeta, idx + 1, currentModule);
+  }
+
+  // ==================== KNOWLEDGE CHECK ====================
+  function startKnowledgeCheck() {
+    const kcData = sectionData?.knowledge_check;
+    if (!kcData?.questions?.length) return;
+
+    kcQuestions = kcData.questions;
+    kcCurrentIdx = 0;
+    kcScore = 0;
+    kcAnswers = [];
+    kcExplainHistory = [];
+
+    // Set section title in KC header
+    const titleEl = document.getElementById('kcSectionTitle');
+    if (titleEl) titleEl.textContent = sectionData?.meta?.title || 'Knowledge Check';
+
+    showScreen('kcScreen');
+    renderKcQuestion();
+  }
+
+  function renderKcQuestion() {
+    const q = kcQuestions[kcCurrentIdx];
+    if (!q) { showKcResults(); return; }
+
+    // Progress dots
+    const dotsEl = document.getElementById('kcDots');
+    dotsEl.innerHTML = '';
+    kcQuestions.forEach((_, i) => {
+      const dot = document.createElement('div');
+      dot.className = 'kc-dot' +
+        (i < kcCurrentIdx ? ' done' : i === kcCurrentIdx ? ' active' : '');
+      dotsEl.appendChild(dot);
+    });
+
+    document.getElementById('kcCounter').textContent = (kcCurrentIdx + 1) + ' / ' + kcQuestions.length;
+    document.getElementById('kcQuestion').textContent = q.question;
+    document.getElementById('kcFeedback').style.display = 'none';
+    document.getElementById('kcExplainDrawer').style.display = 'none';
+
+    const optionsEl = document.getElementById('kcOptions');
+    optionsEl.innerHTML = '';
+
+    if (q.type === 'mc') {
+      q.options.forEach((opt, i) => {
+        const el = document.createElement('div');
+        el.className = 'kc-option';
+        el.dataset.value = opt.charAt(0); // A, B, C, D
+        el.innerHTML = '<div class="kc-letter">' + opt.charAt(0) + '</div><div class="kc-opt-text">' + P002Security.escapeHtml(opt.slice(3)) + '</div>';
+        el.onclick = () => selectKcOption(el, opt.charAt(0));
+        optionsEl.appendChild(el);
+      });
+    } else if (q.type === 'tf') {
+      ['True', 'False'].forEach(val => {
+        const el = document.createElement('div');
+        el.className = 'kc-option';
+        el.dataset.value = val;
+        el.innerHTML = '<div class="kc-letter">' + val.charAt(0) + '</div><div class="kc-opt-text">' + val + '</div>';
+        el.onclick = () => selectKcOption(el, val);
+        optionsEl.appendChild(el);
+      });
+    } else if (q.type === 'sa') {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'padding:0;width:100%;';
+      wrap.innerHTML = '<textarea id="kcSaInput" placeholder="Type your answer..." style="width:100%;background:#111;border:1px solid #1a1a1a;border-radius:10px;padding:12px;font-size:13px;color:#ccc;font-family:inherit;resize:none;min-height:80px;outline:none;box-sizing:border-box;"></textarea>';
+      optionsEl.appendChild(wrap);
+    }
+
+    const submitBtn = document.getElementById('kcSubmitBtn');
+    submitBtn.textContent = 'Check Answer';
+    submitBtn.disabled = q.type !== 'sa';
+    submitBtn.className = 'kc-submit' + (q.type === 'sa' ? '' : ' disabled');
+    submitBtn.onclick = submitKcAnswer;
+
+    // Enable SA button when text entered
+    if (q.type === 'sa') {
+      setTimeout(() => {
+        const ta = document.getElementById('kcSaInput');
+        if (ta) ta.addEventListener('input', () => {
+          submitBtn.disabled = ta.value.trim().length < 3;
+          submitBtn.className = 'kc-submit' + (ta.value.trim().length < 3 ? ' disabled' : '');
+        });
+      }, 50);
+    }
+  }
+
+  function selectKcOption(el, value) {
+    document.querySelectorAll('#kcOptions .kc-option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    el.dataset.selected = value;
+    const btn = document.getElementById('kcSubmitBtn');
+    btn.disabled = false;
+    btn.className = 'kc-submit';
+  }
+
+  async function submitKcAnswer() {
+    const q = kcQuestions[kcCurrentIdx];
+    const feedbackEl = document.getElementById('kcFeedback');
+    const submitBtn = document.getElementById('kcSubmitBtn');
+    submitBtn.disabled = true;
+
+    let isCorrect = false;
+    let userAnswer = '';
+
+    if (q.type === 'mc') {
+      const selected = document.querySelector('#kcOptions .kc-option.selected');
+      if (!selected) return;
+      userAnswer = selected.dataset.value;
+      isCorrect = userAnswer === q.answer;
+      // Mark options
+      document.querySelectorAll('#kcOptions .kc-option').forEach(o => {
+        if (o.dataset.value === q.answer) o.classList.add('correct');
+        else if (o.dataset.value === userAnswer && !isCorrect) o.classList.add('wrong');
+      });
+    } else if (q.type === 'tf') {
+      const selected = document.querySelector('#kcOptions .kc-option.selected');
+      if (!selected) return;
+      userAnswer = selected.dataset.value;
+      const correctStr = q.answer === true ? 'True' : 'False';
+      isCorrect = userAnswer === correctStr;
+      document.querySelectorAll('#kcOptions .kc-option').forEach(o => {
+        if (o.dataset.value === correctStr) o.classList.add('correct');
+        else if (o.dataset.value === userAnswer && !isCorrect) o.classList.add('wrong');
+      });
+    } else if (q.type === 'sa') {
+      const ta = document.getElementById('kcSaInput');
+      userAnswer = ta?.value?.trim() || '';
+      ta.disabled = true;
+      // Grade with AI
+      feedbackEl.style.display = 'block';
+      document.getElementById('kcFeedbackIcon').textContent = '···';
+      document.getElementById('kcFeedbackText').textContent = 'Grading...';
+      document.getElementById('kcFeedbackText').className = 'kc-result-text';
+      document.getElementById('kcExplanation').textContent = '';
+      document.getElementById('kcNextBtn').style.display = 'none';
+      document.getElementById('kcExplainBtn').style.display = 'none';
+
+      try {
+        const sp = 'You are grading a short answer question. Respond with JSON only: {"correct": true/false, "feedback": "1-2 sentence feedback"}';
+        const msg = 'Question: ' + q.question + '\nModel answer: ' + q.sample_answer + '\nKey points: ' + (q.key_points || []).join(', ') + '\nStudent answer: ' + userAnswer;
+        const reply = await P002Api.callClaude(sp, [{role:'user', content: msg}], null, 'haiku');
+        const clean = reply.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        const graded = JSON.parse(clean);
+        isCorrect = graded.correct === true;
+        showKcFeedback(isCorrect, graded.feedback || q.sample_answer, q.type);
+      } catch(e) {
+        // Fallback — mark as informational
+        isCorrect = true;
+        showKcFeedback(true, q.sample_answer, q.type);
+      }
+      kcAnswers.push({ correct: isCorrect, type: q.type });
+      if (isCorrect) kcScore++;
+      return;
+    }
+
+    kcAnswers.push({ correct: isCorrect, type: q.type });
+    if (isCorrect) kcScore++;
+    showKcFeedback(isCorrect, q.explanation, q.type);
+  }
+
+  function showKcFeedback(isCorrect, explanation, type) {
+    const feedbackEl = document.getElementById('kcFeedback');
+    feedbackEl.style.display = 'block';
+
+    document.getElementById('kcFeedbackIcon').textContent = isCorrect ? '✓' : '✗';
+    const resultText = document.getElementById('kcFeedbackText');
+    resultText.textContent = isCorrect ? 'Correct' : (type === 'sa' ? 'See model answer' : 'Not quite');
+    resultText.className = 'kc-result-text ' + (isCorrect ? 'correct' : 'wrong');
+
+    document.getElementById('kcExplanation').textContent = explanation || '';
+
+    const nextBtn = document.getElementById('kcNextBtn');
+    const isLast = kcCurrentIdx >= kcQuestions.length - 1;
+    nextBtn.textContent = isLast ? 'See Results' : 'Next Question →';
+    nextBtn.className = 'kc-next-btn' + (isLast ? ' last' : '');
+    nextBtn.style.display = 'block';
+    nextBtn.onclick = kcNextQuestion;
+
+    const explainBtn = document.getElementById('kcExplainBtn');
+    explainBtn.style.display = (!isCorrect && type !== 'sa') ? 'block' : 'none';
+  }
+
+  function kcNextQuestion() {
+    document.getElementById('kcExplainDrawer').style.display = 'none';
+    kcCurrentIdx++;
+    if (kcCurrentIdx >= kcQuestions.length) {
+      showKcResults();
+    } else {
+      renderKcQuestion();
+    }
+  }
+
+  async function kcOpenExplain() {
+    const q = kcQuestions[kcCurrentIdx];
+    const drawer = document.getElementById('kcExplainDrawer');
+    drawer.style.display = 'block';
+    document.getElementById('kcExplainResponse').textContent = '···';
+    document.getElementById('kcExplainInput').value = '';
+    kcExplainHistory = [];
+
+    const sp = buildDrawerSystemPrompt('explain') + ' The student got this question wrong: "' + q.question + '"';
+    const msg = 'Explain why the correct answer is right and why the student might have gotten confused. Keep it under 100 words.';
+    kcExplainHistory = [{role:'user', content: msg}];
+
+    try {
+      const reply = await P002Api.callClaude(sp, kcExplainHistory, null, 'haiku');
+      document.getElementById('kcExplainResponse').innerHTML = formatBodyText(reply);
+      kcExplainHistory.push({role:'assistant', content: reply});
+    } catch(e) {
+      document.getElementById('kcExplainResponse').textContent = 'Could not load explanation.';
+    }
+  }
+
+  async function kcSendExplainMessage() {
+    const input = document.getElementById('kcExplainInput');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    kcExplainHistory.push({role:'user', content: text});
+    document.getElementById('kcExplainResponse').textContent = '···';
+    try {
+      const reply = await P002Api.callClaude(buildDrawerSystemPrompt('explain'), kcExplainHistory.slice(-4), null, 'haiku');
+      document.getElementById('kcExplainResponse').innerHTML = formatBodyText(reply);
+      kcExplainHistory.push({role:'assistant', content: reply});
+    } catch(e) {
+      document.getElementById('kcExplainResponse').textContent = 'Error: ' + e.message;
+    }
+  }
+
+  function showKcResults() {
+    const total = kcQuestions.length;
+    const pct = total > 0 ? Math.round((kcScore / total) * 100) : 0;
+
+    document.getElementById('kcResultsScore').textContent = kcScore + '/' + total;
+    document.getElementById('kcResultsPct').textContent = pct + '%';
+    document.getElementById('kcResultsTotal').textContent = total;
+
+    let icon = '📖', title = 'Keep it up';
+    if (pct === 100) { icon = '🏴'; title = 'Section cleared'; }
+    else if (pct >= 67) { icon = '✓'; title = 'Almost there'; }
+    else { icon = '⚡'; title = 'Review recommended'; }
+
+    document.getElementById('kcResultsIcon').textContent = icon;
+    document.getElementById('kcResultsTitle').textContent = title;
+
+    const missed = total - kcScore;
+    document.getElementById('kcResultsMissed').textContent = missed;
+
+    const nextBtn = document.getElementById('kcResultsNextBtn');
+    const hasNext = currentModule?.sections &&
+      currentModule.sections.findIndex(s => s.file === currentSectionMeta?.file) < currentModule.sections.length - 1;
+    nextBtn.textContent = hasNext ? 'Next Section →' : 'Back to Module';
+    nextBtn.onclick = hasNext ? goToNextSection : () => showScreen('moduleScreen');
+
+    showScreen('kcResultsScreen');
+  }
+
+  function kcRetry() {
+    kcCurrentIdx = 0;
+    kcScore = 0;
+    kcAnswers = [];
+    renderKcQuestion();
+    showScreen('kcScreen');
+  }
+
+  function kcReviewSection() {
+    showScreen('readerScreen');
+  }
   function renderReaderContent() {
     const body = document.getElementById('readerBody');
     body.innerHTML = '';
@@ -1135,6 +1471,18 @@ Explain in 3-4 sentences: what their payload did, why it worked at the SQL/code 
     backToSectionPreview,
     startReading,
     endReading,
+    // Sticky next + KC flow
+    stickyNextTapped,
+    skipKcGoNext,
+    startKnowledgeCheck,
+    submitKcAnswer,
+    kcNextQuestion,
+    kcOpenExplain,
+    kcSendExplainMessage,
+    kcRetry,
+    kcReviewSection,
+    goToNextSection,
+    // Reader drawer
     handlePopupAction,
     closeDrawer,
     sendDrawerMessage,
