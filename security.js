@@ -9,6 +9,8 @@ window.P002Security = (() => {
   const MAX_ZIP_SIZE = 10 * 1024 * 1024;
   const MAX_FILE_SIZE = 500 * 1024;
   const ALLOWED_EXTENSIONS = ['.json'];
+
+  // Legacy schema
   const REQUIRED_TOP_KEYS = ['system_prompt', 'lesson', 'teaching_path'];
   const REQUIRED_LESSON_KEYS = ['title', 'module', 'section', 'total_sections', 'difficulty'];
   const REQUIRED_NODE_KEYS = ['id', 'type', 'phase'];
@@ -18,6 +20,12 @@ window.P002Security = (() => {
     'extension', 'session_wrap',
     'deliver', 'check', 'reinforce', 'apply'
   ];
+
+  // Reader schema
+  const READER_REQUIRED_TOP_KEYS = ['meta', 'content', 'ai_context'];
+  const READER_REQUIRED_META_KEYS = ['title', 'module', 'section', 'total_sections', 'difficulty'];
+  const READER_VALID_BLOCK_TYPES = ['heading', 'body', 'code', 'callout'];
+
   const ALLOWED_FOLDERS = [
     'module_intro_web_apps',
     'module_sql_injection',
@@ -74,7 +82,6 @@ window.P002Security = (() => {
     }
 
     if (enforceFolder) {
-      // Allow root-level index.json
       if (path === 'index.json') return path;
       const folder = path.split('/')[0];
       const inAllowedFolder = ALLOWED_FOLDERS.includes(folder);
@@ -102,7 +109,7 @@ window.P002Security = (() => {
       .slice(0, 100);
   }
 
-  // ==================== JSON VALIDATION ====================
+  // ==================== JSON PARSING ====================
   function safeParseJson(str) {
     try {
       const data = JSON.parse(str);
@@ -112,13 +119,69 @@ window.P002Security = (() => {
     }
   }
 
+  // ==================== READER SCHEMA VALIDATION ====================
+  function validateReaderSchema(data) {
+    const errors = [];
+
+    for (const key of READER_REQUIRED_TOP_KEYS) {
+      if (!(key in data)) errors.push('Missing required key: "' + key + '"');
+    }
+
+    if (errors.length > 0) return { valid: false, errors };
+
+    if (typeof data.meta !== 'object' || data.meta === null) {
+      errors.push('meta must be an object');
+    } else {
+      for (const key of READER_REQUIRED_META_KEYS) {
+        if (!(key in data.meta)) errors.push('Missing meta.' + key);
+      }
+      if (typeof data.meta.section !== 'number') errors.push('meta.section must be a number');
+      if (typeof data.meta.total_sections !== 'number') errors.push('meta.total_sections must be a number');
+    }
+
+    if (!Array.isArray(data.content)) {
+      errors.push('content must be an array');
+    } else if (data.content.length === 0) {
+      errors.push('content cannot be empty');
+    } else {
+      data.content.forEach((block, i) => {
+        if (!block.type) {
+          errors.push('content[' + i + '] missing type');
+        } else if (!READER_VALID_BLOCK_TYPES.includes(block.type)) {
+          errors.push('content[' + i + '] unknown type: "' + block.type + '"');
+        }
+      });
+    }
+
+    if (typeof data.ai_context !== 'string' || data.ai_context.trim().length < 5) {
+      errors.push('ai_context must be a non-empty string');
+    }
+
+    if (data.challenge) {
+      if (typeof data.challenge !== 'object') {
+        errors.push('challenge must be an object');
+      } else {
+        if (!data.challenge.title) errors.push('challenge.title is required');
+        if (!data.challenge.flag) errors.push('challenge.flag is required');
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  function validateReaderJson(jsonStr) {
+    const parsed = safeParseJson(jsonStr);
+    if (!parsed.ok) return { ok: false, data: null, errors: ['Invalid JSON: ' + parsed.error], schema: 'reader' };
+    const result = validateReaderSchema(parsed.data);
+    return { ok: result.valid, data: parsed.data, errors: result.errors, schema: 'reader' };
+  }
+
+  // ==================== LEGACY SCHEMA VALIDATION ====================
   function validateLessonSchema(data) {
     const errors = [];
 
     for (const key of REQUIRED_TOP_KEYS) {
-      if (!(key in data)) {
-        errors.push('Missing required top-level key: "' + key + '"');
-      }
+      if (!(key in data)) errors.push('Missing required top-level key: "' + key + '"');
     }
 
     if (errors.length > 0) return { valid: false, errors };
@@ -127,16 +190,10 @@ window.P002Security = (() => {
       errors.push('lesson must be an object');
     } else {
       for (const key of REQUIRED_LESSON_KEYS) {
-        if (!(key in data.lesson)) {
-          errors.push('Missing lesson.' + key);
-        }
+        if (!(key in data.lesson)) errors.push('Missing lesson.' + key);
       }
-      if (typeof data.lesson.section !== 'number') {
-        errors.push('lesson.section must be a number');
-      }
-      if (typeof data.lesson.total_sections !== 'number') {
-        errors.push('lesson.total_sections must be a number');
-      }
+      if (typeof data.lesson.section !== 'number') errors.push('lesson.section must be a number');
+      if (typeof data.lesson.total_sections !== 'number') errors.push('lesson.total_sections must be a number');
     }
 
     if (!Array.isArray(data.teaching_path)) {
@@ -146,12 +203,10 @@ window.P002Security = (() => {
     } else {
       data.teaching_path.forEach((node, i) => {
         for (const key of REQUIRED_NODE_KEYS) {
-          if (!(key in node)) {
-            errors.push('teaching_path[' + i + '] missing required key: "' + key + '"');
-          }
+          if (!(key in node)) errors.push('teaching_path[' + i + '] missing key: "' + key + '"');
         }
         if (node.type && !VALID_NODE_TYPES.includes(node.type)) {
-          errors.push('teaching_path[' + i + '] has unknown type: "' + node.type + '"');
+          errors.push('teaching_path[' + i + '] unknown type: "' + node.type + '"');
         }
       });
     }
@@ -163,18 +218,32 @@ window.P002Security = (() => {
     return { valid: errors.length === 0, errors };
   }
 
+  // ==================== AUTO-DETECT SCHEMA ====================
   function validateLessonJson(jsonStr) {
     const parsed = safeParseJson(jsonStr);
     if (!parsed.ok) {
-      return { ok: false, data: null, errors: ['Invalid JSON: ' + parsed.error] };
+      return { ok: false, data: null, errors: ['Invalid JSON: ' + parsed.error], schema: 'unknown' };
     }
 
-    const schema = validateLessonSchema(parsed.data);
-    if (!schema.valid) {
-      return { ok: false, data: parsed.data, errors: schema.errors };
+    const isReader = 'meta' in parsed.data && 'content' in parsed.data;
+    const isLegacy = 'system_prompt' in parsed.data && 'teaching_path' in parsed.data;
+
+    if (isReader) {
+      const result = validateReaderSchema(parsed.data);
+      return { ok: result.valid, data: parsed.data, errors: result.errors, schema: 'reader' };
     }
 
-    return { ok: true, data: parsed.data, errors: [] };
+    if (isLegacy) {
+      const result = validateLessonSchema(parsed.data);
+      return { ok: result.valid, data: parsed.data, errors: result.errors, schema: 'legacy' };
+    }
+
+    return {
+      ok: false,
+      data: parsed.data,
+      errors: ['Unknown schema — needs (meta + content) or (system_prompt + teaching_path)'],
+      schema: 'unknown'
+    };
   }
 
   // ==================== MANIFEST VALIDATION ====================
@@ -196,20 +265,17 @@ window.P002Security = (() => {
       data.sections.forEach(function(s, i) {
         if (typeof s.file !== 'string' || !s.file.trim()) errors.push('Section ' + i + ' missing file');
         if (typeof s.title !== 'string' || !s.title.trim()) errors.push('Section ' + i + ' missing title');
-        // Block lesson fields inside manifest sections
         if (s.system_prompt || s.teaching_path || s.simulation) {
           errors.push('Section ' + i + ' contains disallowed fields');
         }
       });
     }
 
-    // Block lesson fields at top level
     var forbidden = ['system_prompt', 'teaching_path', 'simulation', 'teaching_rules'];
     forbidden.forEach(function(f) {
       if (data[f]) errors.push('Manifest contains disallowed field: ' + f);
     });
 
-    // module_key must be safe
     if (data.module_key && !/^[a-z0-9_]+$/.test(data.module_key)) {
       errors.push('module_key must be lowercase letters, numbers, and underscores only');
     }
@@ -273,7 +339,6 @@ window.P002Security = (() => {
         continue;
       }
 
-      // Route to correct validator based on filename
       const baseName = filename.split('/').pop();
       const validation = baseName === 'manifest.json'
         ? validateManifestJson(content)
@@ -342,6 +407,8 @@ window.P002Security = (() => {
     getFilename,
     safeParseJson,
     validateLessonSchema,
+    validateReaderSchema,
+    validateReaderJson,
     validateLessonJson,
     validateManifestJson,
     processLessonZip,
@@ -351,6 +418,7 @@ window.P002Security = (() => {
     ALLOWED_FOLDERS,
     MAX_ZIP_SIZE,
     MAX_FILE_SIZE,
+    READER_VALID_BLOCK_TYPES,
   };
 
 })();
