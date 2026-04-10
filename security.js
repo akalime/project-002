@@ -73,6 +73,8 @@ window.P002Security = (() => {
     }
 
     if (enforceFolder) {
+      // Allow root-level index.json
+      if (path === 'index.json') return path;
       const folder = path.split('/')[0];
       const inAllowedFolder = ALLOWED_FOLDERS.includes(folder);
       if (!inAllowedFolder) {
