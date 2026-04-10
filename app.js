@@ -396,27 +396,8 @@ window.P002App = (() => {
   function hidePopup() { document.getElementById('askAiPopup').classList.remove('visible'); }
 
   async function callHaiku(systemPrompt, messages) {
-    // Direct call to edge function with haiku model \u2014 cheaper for drawer quick Q&A
-    const session = await P002Api.getSession();
-    const token = session?.access_token;
-    const resp = await fetch(
-      'https://hmrnwvahkcoexjcxohel.supabase.co/functions/v1/claude-proxy',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token,
-        },
-        body: JSON.stringify({
-          system: systemPrompt,
-          messages: messages.slice(-4),
-          model: 'haiku',
-        }),
-      }
-    );
-    if (!resp.ok) throw new Error('Haiku call failed: ' + resp.status);
-    const data = await resp.json();
-    return data.content?.[0]?.text || '';
+    // Use P002Api.callClaude with haiku model — correct URL and headers
+    return await P002Api.callClaude(systemPrompt, messages.slice(-4), null, 'haiku');
   }
 
   async function handlePopupAction(action) {
