@@ -163,7 +163,6 @@ window.P002App = (() => {
     selectedModule = null;
     sectionData = null;
     showScreen('homeScreen');
-    // Close any open section pickers
     document.querySelectorAll('.section-picker').forEach(p => p.classList.remove('open'));
   }
 
@@ -233,6 +232,7 @@ window.P002App = (() => {
 
     return `${base}
 
+${data.reading_material ? `READING MATERIAL FOR THIS SECTION (teach from this content):\n${data.reading_material}\n` : ''}
 LESSON CONTEXT:
 - Title: ${lesson.title}
 - Section: ${lesson.section}/${lesson.total_sections}
@@ -306,7 +306,6 @@ TEACHING BALANCE -- CRITICAL:
   async function startSession() {
     if (!sectionData) return;
 
-    systemPrompt = buildSystemPrompt(sectionData);
     conversationHistory = [];
     currentPhaseIndex = 0;
     currentNodeIndex = 0;
@@ -334,6 +333,8 @@ TEACHING BALANCE -- CRITICAL:
       const messages = await P002Api.getSessionMessages(lastSession.id);
       if (messages.length > 0) {
         currentSessionId = lastSession.id;
+        // FIX: build systemPrompt before returning so resumed sessions work
+        systemPrompt = buildSystemPrompt(sectionData);
         addSystemMsg(`Resuming session -- ${lesson.title}`);
         messages.forEach(msg => {
           conversationHistory.push({ role: msg.role, content: msg.content });
@@ -350,6 +351,8 @@ TEACHING BALANCE -- CRITICAL:
       }
     }
 
+    // New session
+    systemPrompt = buildSystemPrompt(sectionData);
     currentSessionId = await P002Api.createSession(lesson.section, lesson.module);
     addSystemMsg(`Session started -- ${lesson.title}`);
     callClaude([{ role: 'user', content: 'Begin the lesson now.' }]);
@@ -389,7 +392,7 @@ TEACHING BALANCE -- CRITICAL:
     selectedSection = null;
     currentSectionMeta = null;
     currentModule = null;
-    currentNodeIndex = 0;;
+    currentNodeIndex = 0;
     backToModules();
   }
 
@@ -404,7 +407,6 @@ TEACHING BALANCE -- CRITICAL:
     try {
       const sig = await P002Api.signPrompt(systemPrompt);
 
-      // Trim history to last 20 messages
       const trimmed = messages.slice(-20);
 
       const reply = await P002Api.callClaude(systemPrompt, trimmed, sig);
@@ -477,7 +479,6 @@ TEACHING BALANCE -- CRITICAL:
     const text = input.value.trim();
     if (!text || document.getElementById('sendBtn').disabled) return;
 
-    // Sanitize input
     const sanitized = P002Security.sanitizeInput(text, 2000);
 
     // Flag submission
@@ -994,9 +995,7 @@ TEACHING BALANCE -- CRITICAL:
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }
 
-
   // ==================== HOME SCREEN ====================
-
   let currentModule = null;
   let currentSectionMeta = null;
 
@@ -1016,19 +1015,17 @@ TEACHING BALANCE -- CRITICAL:
     if (!grid) return;
 
     try {
-      // Try index.json first (fast path)
       let modules = [];
       try {
         const text = await P002Api.downloadFile(MODULE_INDEX_PATH);
         const parsed = JSON.parse(text);
         modules = parsed.modules || [];
       } catch(e) {
-        // Fall back to listing bucket and reading manifests
         const items = await P002Api.listBucket('');
         const folders = items.filter(f => !f.metadata && !f.name.startsWith('.'));
         modules = folders.map(f => ({
           key: f.name,
-          title: f.name.replace(/module_|_/g, ' ').trim().replace(/\w/g, c => c.toUpperCase()),
+          title: f.name.replace(/module_|_/g, ' ').trim().replace(/\w/g, c => c.toUpperCase()),
           category: 'Other',
           difficulty: 'intermediate',
           section_count: 0,
@@ -1042,7 +1039,6 @@ TEACHING BALANCE -- CRITICAL:
         return;
       }
 
-      // Group by category
       const categories = {};
       modules.forEach(m => {
         const cat = m.category || 'Other';
@@ -1102,7 +1098,6 @@ TEACHING BALANCE -- CRITICAL:
     selectedModule = moduleKey;
     showScreen('moduleScreen');
 
-    // Reset module detail screen
     document.getElementById('moduleDetailTitle').textContent = 'Loading...';
     document.getElementById('moduleDetailDesc').textContent = '';
     document.getElementById('moduleDetailCategory').textContent = '';
@@ -1169,7 +1164,6 @@ TEACHING BALANCE -- CRITICAL:
     document.getElementById('sectionPreviewTitle').textContent = sectionMeta.title;
     document.getElementById('sectionPreviewDesc').textContent = sectionMeta.description || '';
 
-    // Build preview body
     const body = document.getElementById('sectionPreviewBody');
     body.innerHTML = '';
 
@@ -1184,7 +1178,6 @@ TEACHING BALANCE -- CRITICAL:
 
     showScreen('sectionScreen');
 
-    // Load section JSON in background
     const btn = document.getElementById('sectionStartBtn');
     const status = document.getElementById('sectionStartStatus');
     btn.disabled = true;
@@ -1216,9 +1209,9 @@ TEACHING BALANCE -- CRITICAL:
     showScreen('moduleScreen');
   }
 
-  async function loadContinueBanner() {} // reserved for later
+  async function loadContinueBanner() {}
 
-    // ==================== PUBLIC API ====================
+  // ==================== PUBLIC API ====================
   return {
     init,
     handleAuth,
