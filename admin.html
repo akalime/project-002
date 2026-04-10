@@ -478,15 +478,21 @@ input,textarea,select { font-family:var(--font-body); }
                 </div>
               </div>
               <div class="field"><div class="field-label">Module Title</div><input class="field-input" id="genTitle" placeholder="Web Requests"></div>
-              <div class="field"><div class="field-label">Category</div>
-                <select class="field-select" id="genCategory">
+              <div class="field">
+                <div class="field-label">Category</div>
+                <select class="field-select" id="genCategory" onchange="P002Admin.handleCategoryChange()">
                   <option>Web Fundamentals</option>
                   <option>Web Exploitation</option>
                   <option>Network</option>
                   <option>Defense</option>
                   <option>Systems</option>
+                  <option>CompTIA A+</option>
+                  <option>CompTIA Security+</option>
+                  <option>CompTIA Network+</option>
                   <option>Other</option>
+                  <option value="__new__">+ Add new category...</option>
                 </select>
+                <input class="field-input" id="genCategoryCustom" placeholder="Type new category name..." style="display:none;margin-top:6px;" onkeydown="if(event.key==='Escape')P002Admin.cancelCustomCategory()">
               </div>
               <div class="field-row">
                 <div class="field"><div class="field-label">Page From</div><input class="field-input" id="genPageFrom" type="number" placeholder="1" min="1"></div>
