@@ -3,12 +3,23 @@
   "short_name": "P002",
   "description": "AI-powered cybersecurity learning platform",
   "start_url": "/project-002/",
+  "scope": "/project-002/",
   "display": "standalone",
   "background_color": "#1a1a1a",
   "theme_color": "#1a1a1a",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "icons": [
-    { "src": "/project-002/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/project-002/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "/project-002/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/project-002/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
