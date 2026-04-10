@@ -488,6 +488,10 @@ input,textarea,select { font-family:var(--font-body); }
                   <option>Other</option>
                 </select>
               </div>
+              <div class="field-row">
+                <div class="field"><div class="field-label">Page From</div><input class="field-input" id="genPageFrom" type="number" placeholder="1" min="1"></div>
+                <div class="field"><div class="field-label">Page To</div><input class="field-input" id="genPageTo" type="number" placeholder="150" min="1"></div>
+              </div>
               <div class="field"><div class="field-label">Chapter Hint (optional)</div><input class="field-input" id="genHint" placeholder="e.g. 9 chapters, each chapter = 1 section"></div>
               <button class="btn-primary" onclick="P002Admin.startGeneration()" id="genStartBtn">✨ Generate →</button>
             </div>
