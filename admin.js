@@ -259,7 +259,7 @@ window.P002Admin = (() => {
   }
 
   async function generateSection(chapter, sectionNum, totalSections, moduleKey, moduleTitle, category, difficulty) {
-    const systemPrompt = `You are a cybersecurity curriculum developer. Convert source material into an educational reader section in JSON format.
+    const systemPrompt = `You are a curriculum developer. Convert source material into an educational reader section in JSON format.
 
 CRITICAL RULES:
 - Rewrite ALL content completely in your own words. Never reproduce source text verbatim.
@@ -282,13 +282,30 @@ OUTPUT SCHEMA:
     {"type": "code", "lang": "sql|bash|python|text", "text": "..."},
     {"type": "callout", "text": "..."}
   ],
-  "challenge": null or {
-    "title": "...",
-    "description": "...",
-    "query": "...",
-    "flag": "the answer",
-    "sim_type": "login|source|comment|http|api|files|none",
-    "hints": ["hint1", "hint2", "hint3"]
+  "challenge": null,
+  "knowledge_check": {
+    "source": "extracted or generated",
+    "questions": [
+      {
+        "type": "mc",
+        "question": "...",
+        "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+        "answer": "A",
+        "explanation": "1-2 sentences explaining why"
+      },
+      {
+        "type": "tf",
+        "question": "True or false: ...",
+        "answer": true,
+        "explanation": "1-2 sentences explaining why"
+      },
+      {
+        "type": "sa",
+        "question": "...",
+        "sample_answer": "2-3 sentence model answer for AI grading",
+        "key_points": ["point1", "point2", "point3"]
+      }
+    ]
   },
   "ai_context": "2-3 sentence summary of what this section covers for the AI tutor"
 }
@@ -297,8 +314,11 @@ STRICT RULES — you MUST follow these:
 - Write exactly 6-8 content blocks, no more
 - Each body block: 1-2 sentences only
 - Pick the 3-4 most important concepts, ignore everything else
-- challenge must be null unless content explicitly covers an exploitable attack technique
-- Your ENTIRE JSON response must be under 1500 tokens`;
+- challenge must always be null
+- For knowledge_check: target 10 questions, max 20. Mix all 3 types (mc, tf, sa).
+- If the source material contains review questions or assessment questions, extract them directly and set source to "extracted". Otherwise generate questions from the content and set source to "generated".
+- Every question MUST relate directly to content in this section only
+- Your ENTIRE JSON response must be under 1800 tokens`;
 
     const userMsg = `Convert this chapter into a reader section. Chapter title: "${chapter.title}"\n\nContent:\n${chapter.text}`;
 
@@ -345,16 +365,20 @@ STRICT RULES — you MUST follow these:
     list.innerHTML = '';
     genSections.forEach((s, i) => {
       const blocks = s.content?.length || 0;
-      const isShort = blocks < 10;
+      const isShort = blocks < 6;
+      const qCount = s.knowledge_check?.questions?.length || 0;
+      const qSource = s.knowledge_check?.source || '';
       const row = document.createElement('div');
       row.className = 'section-row' + (isShort ? ' warn' : '');
       row.innerHTML =
         '<div class="sr-num">' + String(i+1).padStart(2,'0') + '</div>' +
         '<div class="sr-info">' +
           '<div class="sr-title">' + P002Security.escapeHtml(s.meta?.title || 'Section ' + (i+1)) + '</div>' +
-          '<div class="sr-meta">' + (s.meta?.minutes||'?') + ' min · ' + blocks + ' blocks' + (s.challenge ? ' · 🏴' : '') + (isShort ? ' — short?' : '') + '</div>' +
+          '<div class="sr-meta">' + (s.meta?.minutes||'?') + ' min · ' + blocks + ' blocks' +
+          (qCount > 0 ? ' · ' + qCount + 'Q' + (qSource === 'extracted' ? ' 📖' : ' ✦') : ' · no Qs') +
+          (isShort ? ' — short?' : '') + '</div>' +
         '</div>' +
-        '<div class="sr-badge ' + (isShort ? 'warn' : s.challenge ? 'flag' : 'ok') + '">' + (isShort ? '⚠' : s.challenge ? '🏴' : '✓') + '</div>' +
+        '<div class="sr-badge ' + (isShort ? 'warn' : qCount >= 5 ? 'ok' : 'warn') + '">' + (isShort ? '⚠' : qCount >= 5 ? '✓' : '⚠') + '</div>' +
         '<button class="sr-edit" onclick="P002Admin.editGenSection(' + i + ')">✏</button>';
       list.appendChild(row);
     });
