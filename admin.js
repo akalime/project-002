@@ -174,8 +174,8 @@ window.P002Admin = (() => {
       } catch(e) {
         logGen('err', '✗ Section ' + (i+1) + ' failed: ' + e.message);
       }
-      // Rate limit buffer — 500ms between calls
-      await new Promise(r => setTimeout(r, 500));
+      // Rate limit buffer — 1500ms between calls
+      await new Promise(r => setTimeout(r, 1500));
     }
 
     updateProgress(100, 'Complete', 'All sections generated');
@@ -298,7 +298,9 @@ Include 10-16 content blocks. This may be one part of a larger chapter — focus
     const userMsg = `Convert this chapter into a reader section. Chapter title: "${chapter.title}"\n\nContent:\n${chapter.text}`;
 
     // Use direct fetch with correct headers — needs max_tokens: 4096 for full JSON output
-    const genSession = await P002Api.getSession();
+    // Force token refresh before each API call
+    const { data: { session: freshSession } } = await P002Api.getClient().auth.getSession();
+    const genSession = freshSession || await P002Api.getSession();
     const genResponse = await fetch(P002Api.SUPABASE_URL + '/functions/v1/claude-proxy', {
       method: 'POST',
       headers: {
