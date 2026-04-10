@@ -547,39 +547,33 @@ window.P002App = (() => {
   function renderChallengeBody(ch) {
     const body = document.getElementById('challengeBody');
     body.innerHTML = '';
-    if (ch.query) {
+    const simType = ch.sim_type || 'none';
+
+    if (ch.query && (simType === 'login' || simType === 'api' || simType === 'none')) {
       const qEl = document.createElement('div');
       qEl.className = 'challenge-query';
       qEl.textContent = ch.query;
       body.appendChild(qEl);
     }
-    if (ch.query) {
-      const sim = document.createElement('div');
-      sim.className = 'target-app';
-      sim.innerHTML =
-        '<div class="target-app-bar">'+
-          '<div class="target-dot" style="background:#ff5f57"></div>'+
-          '<div class="target-dot" style="background:#febc2e"></div>'+
-          '<div class="target-dot" style="background:#28c840"></div>'+
-          '<div class="target-url">vuln-lab.local/login</div>'+
-        '</div>'+
-        '<div class="target-app-body">'+
-          '<div class="target-label">Username</div>'+
-          '<input class="target-input" id="simUser" value="admin" readonly />'+
-          '<div class="target-label" style="margin-top:8px;">Password</div>'+
-          '<input class="target-input" id="simPass" placeholder="Enter password..." />'+
-          '<button class="target-submit-btn" style="margin-top:10px;" onclick="P002App.trySimLogin()">Login</button>'+
-          '<div id="simResult" style="margin-top:10px;font-size:12px;text-align:center;min-height:18px;"></div>'+
-        '</div>';
-      body.appendChild(sim);
-    }
+
+    if (simType === 'login')        body.appendChild(buildLoginSim(ch));
+    else if (simType === 'source')  body.appendChild(buildSourceSim(ch));
+    else if (simType === 'comment') body.appendChild(buildCommentSim(ch));
+    else if (simType === 'http')    body.appendChild(buildHttpSim(ch));
+    else if (simType === 'api')     body.appendChild(buildApiSim(ch));
+    else if (simType === 'files')   body.appendChild(buildFilesSim(ch));
+
+    const flagPlaceholder = simType === 'source' ? 'Enter the value you found...'
+      : simType === 'api' ? 'Enter the resource ID you accessed...'
+      : 'Enter your payload...';
     const flagArea = document.createElement('div');
     flagArea.className = 'flag-area';
     flagArea.innerHTML =
-      '<div class="flag-label">🏴 Your Payload</div>'+
-      '<input class="flag-input" id="flagInput" placeholder="Enter your payload..." onkeydown="if(event.key===\'Enter\')P002App.submitFlag()" />'+
+      '<div class="flag-label">🏴 Your Answer</div>'+
+      '<input class="flag-input" id="flagInput" placeholder="'+flagPlaceholder+'" onkeydown="if(event.key==='Enter')P002App.submitFlag()" />'+
       '<button class="flag-submit" onclick="P002App.submitFlag()">Submit Flag</button>';
     body.appendChild(flagArea);
+
     const helpRow = document.createElement('div');
     helpRow.className = 'challenge-help-row';
     helpRow.innerHTML =
@@ -588,6 +582,116 @@ window.P002App = (() => {
       '<button class="challenge-help-btn ai" onclick="P002App.openChallengeChat()">💬 Discuss</button>';
     body.appendChild(helpRow);
   }
+
+  // ==================== SIM TEMPLATES ====================
+  function simAppBar(url) {
+    return '<div class="target-app-bar">'+
+      '<div class="target-dot" style="background:#ff5f57"></div>'+
+      '<div class="target-dot" style="background:#febc2e"></div>'+
+      '<div class="target-dot" style="background:#28c840"></div>'+
+      '<div class="target-url">'+P002Security.escapeHtml(url||'vuln-lab.local')+'</div>'+
+    '</div>';
+  }
+
+  function buildLoginSim(ch) {
+    const el = document.createElement('div');
+    el.className = 'target-app';
+    el.innerHTML = simAppBar('vuln-lab.local/login')+
+      '<div class="target-app-body">'+
+        '<div class="target-label">Username</div>'+
+        '<input class="target-input" id="simUser" value="admin" readonly />'+
+        '<div class="target-label" style="margin-top:8px;">Password</div>'+
+        '<input class="target-input" id="simPass" placeholder="Enter password..." />'+
+        '<button class="target-submit-btn" style="margin-top:10px;" onclick="P002App.trySimLogin()">Login</button>'+
+        '<div id="simResult" style="margin-top:10px;font-size:12px;text-align:center;min-height:18px;"></div>'+
+      '</div>';
+    return el;
+  }
+
+  function buildSourceSim(ch) {
+    const el = document.createElement('div');
+    el.className = 'target-app';
+    const src = ch.source_content || '<!-- page source -->
+<html>
+  <body>
+    <h1>Welcome</h1>
+  </body>
+</html>';
+    el.innerHTML = simAppBar('vuln-lab.local')+
+      '<div style="background:#1a1a1a;">'+
+        '<div style="background:#252525;padding:5px 12px;font-family:monospace;font-size:9px;color:#888;border-bottom:1px solid #333;letter-spacing:1px;">PAGE SOURCE</div>'+
+        '<pre style="margin:0;padding:12px;font-family:monospace;font-size:11px;color:#a0c080;line-height:1.6;overflow-x:auto;white-space:pre-wrap;max-height:220px;overflow-y:auto;">'+P002Security.escapeHtml(src)+'</pre>'+
+      '</div>';
+    return el;
+  }
+
+  function buildCommentSim(ch) {
+    const el = document.createElement('div');
+    el.className = 'target-app';
+    el.innerHTML = simAppBar('vuln-lab.local/blog')+
+      '<div class="target-app-body">'+
+        '<div class="target-label">Leave a Comment</div>'+
+        '<textarea id="simComment" placeholder="Write your comment..." style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:12px;resize:none;height:60px;box-sizing:border-box;font-family:sans-serif;"></textarea>'+
+        '<button class="target-submit-btn" style="margin-top:8px;" onclick="P002App.trySimComment()">Post Comment</button>'+
+        '<div id="simComments" style="margin-top:10px;border-top:1px solid #eee;padding-top:8px;min-height:20px;"></div>'+
+      '</div>';
+    return el;
+  }
+
+  function buildHttpSim(ch) {
+    const req = ch.http_request || 'POST /transfer HTTP/1.1\nHost: bank.local\nCookie: session=abc123\n\namount=100&to=victim';
+    const el = document.createElement('div');
+    el.className = 'target-app';
+    el.innerHTML = simAppBar('bank.local')+
+      '<div style="background:#1a1a1a;padding:12px;">'+
+        '<div style="font-family:monospace;font-size:9px;color:#888;margin-bottom:6px;letter-spacing:1px;">HTTP REQUEST</div>'+
+        '<textarea id="simHttpReq" style="width:100%;background:#111;border:1px solid #333;border-radius:4px;padding:10px;font-family:monospace;font-size:11px;color:#a0c080;resize:none;height:120px;box-sizing:border-box;">'+P002Security.escapeHtml(req)+'</textarea>'+
+        '<button class="target-submit-btn" style="margin-top:8px;background:#2a5298;" onclick="P002App.trySimHttp()">Send Request</button>'+
+        '<div id="simHttpResult" style="margin-top:8px;font-family:monospace;font-size:11px;color:#888;min-height:20px;"></div>'+
+      '</div>';
+    return el;
+  }
+
+  function buildApiSim(ch) {
+    const url = ch.api_url || '/api/orders/1001';
+    const el = document.createElement('div');
+    el.className = 'target-app';
+    el.innerHTML = simAppBar('api.vuln-lab.local')+
+      '<div class="target-app-body">'+
+        '<div class="target-label">Endpoint</div>'+
+        '<div style="display:flex;gap:6px;align-items:center;">'+
+          '<div style="background:#e8f4e8;color:#2a7a2a;font-size:10px;font-weight:700;padding:4px 8px;border-radius:3px;flex-shrink:0;">GET</div>'+
+          '<input class="target-input" id="simApiUrl" value="'+P002Security.escapeHtml(url)+'" style="flex:1;font-family:monospace;font-size:11px;" />'+
+        '</div>'+
+        '<button class="target-submit-btn" style="margin-top:8px;background:#2a5298;" onclick="P002App.trySimApi()">Send</button>'+
+        '<pre id="simApiResult" style="margin-top:8px;background:#111;border-radius:4px;padding:8px;font-family:monospace;font-size:10px;color:#a0c080;min-height:40px;white-space:pre-wrap;overflow-x:auto;"></pre>'+
+      '</div>';
+    return el;
+  }
+
+  function buildFilesSim(ch) {
+    const files = ch.file_listing || [
+      {name:'index.html',size:'4.2KB',type:'file'},
+      {name:'config.php.bak',size:'1.1KB',type:'file',highlight:true},
+      {name:'uploads/',size:'-',type:'dir'},
+    ];
+    let rows = files.map(f =>
+      '<div style="display:flex;gap:10px;align-items:center;padding:5px 0;border-bottom:1px solid #eee;font-size:12px;'+(f.highlight?'background:#fff3cd;':'')+'">'+
+        '<span>'+(f.type==='dir'?'📁':'📄')+'</span>'+
+        '<span style="flex:1;font-family:monospace;color:'+(f.highlight?'#c45000':'#333')+';">'+P002Security.escapeHtml(f.name)+'</span>'+
+        '<span style="color:#888;font-size:10px;">'+P002Security.escapeHtml(f.size)+'</span>'+
+      '</div>'
+    ).join('');
+    const el = document.createElement('div');
+    el.className = 'target-app';
+    el.innerHTML = simAppBar('vuln-lab.local')+
+      '<div class="target-app-body">'+
+        '<div style="font-size:11px;color:#888;margin-bottom:8px;font-family:monospace;">Index of /</div>'+
+        rows+
+      '</div>';
+    return el;
+  }
+
 
   function trySimLogin() {
     const pass = document.getElementById('simPass')?.value || '';
@@ -601,6 +705,59 @@ window.P002App = (() => {
       result.innerHTML = '<span style="color:#4ade80;">✓ Login successful</span>';
     } else {
       result.innerHTML = '<span style="color:#ff4d4d;">✗ Invalid credentials</span>';
+    }
+  }
+
+  function trySimComment() {
+    const input = document.getElementById('simComment');
+    const comments = document.getElementById('simComments');
+    const text = input.value.trim();
+    if (!text) return;
+    const hasScript = /<script|onerror=|onload=|javascript:/i.test(text);
+    const hasHtml = /<[a-z]/i.test(text);
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:6px 0;border-bottom:1px solid #eee;font-size:12px;';
+    if (hasScript) {
+      div.innerHTML = '<strong>Guest:</strong> '+text;
+      comments.appendChild(div);
+      setTimeout(() => {
+        document.getElementById('flagInput').value = text;
+        showToast('💥 XSS executed! Cookie: session=abc123', true);
+      }, 500);
+    } else if (hasHtml) {
+      div.innerHTML = '<strong>Guest:</strong> '+text;
+      comments.appendChild(div);
+      document.getElementById('flagInput').value = text;
+    } else {
+      div.innerHTML = '<strong>Guest:</strong> '+P002Security.escapeHtml(text);
+      comments.appendChild(div);
+    }
+    input.value = '';
+  }
+
+  function trySimHttp() {
+    const req = document.getElementById('simHttpReq')?.value || '';
+    const result = document.getElementById('simHttpResult');
+    const flag = sectionData?.challenge?.flag || '';
+    if (req.toLowerCase().includes(flag.toLowerCase()) || req.includes('submit()') || req.includes('auto')) {
+      result.innerHTML = '<span style="color:#4ade80;">HTTP/1.1 200 OK — Transfer processed</span>';
+      document.getElementById('flagInput').value = flag;
+    } else {
+      result.innerHTML = '<span style="color:#888;">HTTP/1.1 200 OK — Request sent</span>';
+    }
+  }
+
+  function trySimApi() {
+    const url = document.getElementById('simApiUrl')?.value || '';
+    const result = document.getElementById('simApiResult');
+    const flag = sectionData?.challenge?.flag || '';
+    const idMatch = url.match(/\/(\d+)\/?$/);
+    const id = idMatch ? idMatch[1] : '1001';
+    if (id !== '1001') {
+      document.getElementById('flagInput').value = id;
+      result.textContent = JSON.stringify({id:parseInt(id),order_total:299.99,customer:"another_user@email.com",status:"shipped"},null,2);
+    } else {
+      result.textContent = JSON.stringify({id:1001,order_total:149.99,customer:"you@email.com",status:"delivered"},null,2);
     }
   }
 
@@ -851,6 +1008,7 @@ window.P002App = (() => {
     continueAfterDebrief, backToReader,
     sendMessage, handleChatKey, autoResize,
     showAdmin, showToast,
+    trySimLogin, trySimComment, trySimHttp, trySimApi,
   };
 
 })();
