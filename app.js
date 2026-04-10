@@ -570,7 +570,7 @@ window.P002App = (() => {
     flagArea.className = 'flag-area';
     flagArea.innerHTML =
       '<div class="flag-label">🏴 Your Answer</div>'+
-      '<input class="flag-input" id="flagInput" placeholder="'+flagPlaceholder+'" onkeydown="if(event.key==='Enter')P002App.submitFlag()" />'+
+      '<input class="flag-input" id="flagInput" placeholder="'+flagPlaceholder+'" onkeydown="if(event.key==="Enter")P002App.submitFlag()" />'+
       '<button class="flag-submit" onclick="P002App.submitFlag()">Submit Flag</button>';
     body.appendChild(flagArea);
 
