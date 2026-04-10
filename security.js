@@ -1,5 +1,5 @@
 // ================================================================
-// PROJECT 002 — security.js
+// PROJECT 002 -- security.js
 // Shared security utilities for index.html and admin.html
 // ================================================================
 
@@ -53,7 +53,7 @@ const P002Security = (() => {
 
   // ==================== PATH SANITIZATION ====================
   /**
-   * Sanitize a file path — strip path traversal, enforce bucket folder
+   * Sanitize a file path -- strip path traversal, enforce bucket folder
    * Returns null if path is invalid
    */
   function sanitizePath(rawPath, enforceFolder = true) {
@@ -117,7 +117,7 @@ const P002Security = (() => {
 
   // ==================== JSON VALIDATION ====================
   /**
-   * Safely parse JSON — returns { ok, data, error }
+   * Safely parse JSON -- returns { ok, data, error }
    */
   function safeParseJson(str) {
     try {
