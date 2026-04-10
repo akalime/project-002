@@ -517,15 +517,10 @@ TEACHING BALANCE -- CRITICAL:
     const div = document.createElement('div');
     div.className = 'message ' + role;
 
-    const roleLabel = document.createElement('div');
-    roleLabel.className = 'msg-role';
-    roleLabel.textContent = role === 'assistant' ? 'AI' : 'You';
-
     const bubble = document.createElement('div');
     bubble.className = 'msg-bubble';
     bubble.innerHTML = formatMessage(content);
 
-    div.appendChild(roleLabel);
     div.appendChild(bubble);
     msgs.appendChild(div);
     msgs.scrollTop = msgs.scrollHeight;
