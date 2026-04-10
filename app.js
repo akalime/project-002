@@ -344,7 +344,9 @@ window.P002App = (() => {
   function formatBodyText(text) {
     let s = P002Security.escapeHtml(text);
     s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+         .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
          .replace(/`([^`]+)`/g, '<code>$1</code>')
+         .replace(/^#{1,3} (.+)$/gm, '<strong>$1</strong>')
          .replace(/\n\n/g, '</p><p>')
          .replace(/\n/g, '<br>');
     return s;
