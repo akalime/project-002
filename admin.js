@@ -247,7 +247,7 @@ window.P002Admin = (() => {
           const partLabel = sectionsPerChapter > 1 ? ' (Part ' + (s+1) + ')' : '';
           sections.push({
             title: chapter.title + partLabel,
-            text: chunk.slice(0, 4000),
+            text: chunk.slice(0, 2500),
             chapterNum: chIdx + 1,
             partNum: s + 1
           });
@@ -293,7 +293,12 @@ OUTPUT SCHEMA:
   "ai_context": "2-3 sentence summary of what this section covers for the AI tutor"
 }
 
-Include 10-16 content blocks. This may be one part of a larger chapter — focus only on the concepts in the provided content. Add a challenge only if the content covers something directly hands-on and exploitable.`;
+STRICT RULES — you MUST follow these:
+- Write exactly 6-8 content blocks, no more
+- Each body block: 1-2 sentences only
+- Pick the 3-4 most important concepts, ignore everything else
+- challenge must be null unless content explicitly covers an exploitable attack technique
+- Your ENTIRE JSON response must be under 1500 tokens`;
 
     const userMsg = `Convert this chapter into a reader section. Chapter title: "${chapter.title}"\n\nContent:\n${chapter.text}`;
 
@@ -312,7 +317,7 @@ Include 10-16 content blocks. This may be one part of a larger chapter — focus
         system: systemPrompt,
         messages: [{ role: 'user', content: userMsg }],
         model: (document.getElementById('genModel')?.value || 'haiku'),
-        max_tokens: 2000,
+        max_tokens: 1800,
       })
     });
     if (!genResponse.ok) throw new Error('API error: ' + genResponse.status);
