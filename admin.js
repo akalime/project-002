@@ -124,9 +124,8 @@ window.P002Admin = (() => {
     document.getElementById('uzFilename').textContent = '✓ ' + file.name;
     document.getElementById('uzTitle').textContent = 'PDF selected';
     document.getElementById('uzSub').textContent = (file.size / 1024 / 1024).toFixed(1) + ' MB';
-    // Auto-fill key from filename
-    const key = 'module_' + file.name.replace('.pdf','').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
-    if (!document.getElementById('genKey').value) document.getElementById('genKey').value = key;
+    // Leave key blank — user fills it in manually
+    // (auto-fill from full PDF title creates overly long keys)
   }
 
   async function startGeneration() {
@@ -560,7 +559,8 @@ STRICT RULES — you MUST follow these:
     arrow.textContent = '▶';
     header.innerHTML =
       '<div class="folder-icon">📁</div>' +
-      '<div class="folder-name">' + P002Security.escapeHtml(folderName) + '</div>';
+      '<div class="folder-name">' + P002Security.escapeHtml(folderName) + '</div>' +
+      '<button class="folder-del" onclick="event.stopPropagation();P002Admin.deleteFolder(\'' + P002Security.escapeHtml(folderName) + '\')">🗑</button>';
     header.insertBefore(arrow, header.firstChild);
 
     const filesDiv = document.createElement('div');
@@ -635,6 +635,31 @@ STRICT RULES — you MUST follow these:
     try {
       await P002Api.deleteFile(path);
       toast('Deleted', 'ok');
+      loadFiles();
+    } catch(e) {
+      toast('Delete failed: ' + e.message, 'err');
+    }
+  }
+
+  async function deleteFolder(folderName) {
+    if (!confirm('Delete entire folder "' + folderName + '" and all its files? This cannot be undone.')) return;
+    try {
+      const files = await P002Api.listBucket(folderName);
+      if (!files.length) {
+        toast('Folder is empty or already deleted', 'warn');
+        loadFiles();
+        return;
+      }
+      let deleted = 0;
+      for (const f of files) {
+        try {
+          await P002Api.deleteFile(folderName + '/' + f.name);
+          deleted++;
+        } catch(e) {
+          console.warn('Failed to delete', f.name, e.message);
+        }
+      }
+      toast('Deleted ' + deleted + ' files from ' + folderName, 'ok');
       loadFiles();
     } catch(e) {
       toast('Delete failed: ' + e.message, 'err');
@@ -1126,10 +1151,15 @@ STRICT RULES — you MUST follow these:
     if (btn) { btn.disabled = true; btn.textContent = '⟳ Building...'; }
     try {
       const items = await P002Api.listBucket('');
-      const folders = items.filter(f => !f.metadata && !f.name.startsWith('.'));
+      const folders = items.filter(f => !f.metadata && !f.name.startsWith('.') && f.name.startsWith('module_'));
       const modules = [];
 
       for (const folder of folders) {
+        // Skip folders with overly long names (bad auto-generated keys)
+        if (folder.name.length > 60) {
+          console.warn('Skipping long folder name:', folder.name);
+          continue;
+        }
         try {
           const data = await P002Api.adminGetFile(folder.name + '/manifest.json');
           const manifest = JSON.parse(data.content);
@@ -1151,7 +1181,8 @@ STRICT RULES — you MUST follow these:
 
       await P002Api.adminSaveFile('index.json', JSON.stringify({ updated: new Date().toISOString().split('T')[0], modules }, null, 2));
       toast('Index rebuilt — ' + modules.length + ' modules', 'ok');
-      document.getElementById('homeIndexMeta').textContent = 'Last rebuilt just now · ' + modules.length + ' modules';
+      const metaEl = document.getElementById('homeIndexMeta');
+      if (metaEl) metaEl.textContent = 'Last rebuilt just now · ' + modules.length + ' modules';
     } catch(e) {
       toast('Rebuild failed: ' + e.message, 'err');
     }
@@ -1356,7 +1387,7 @@ STRICT RULES — you MUST follow these:
     handlePdfDrop, handlePdfSelect, startGeneration,
     editGenSection, saveSectionEdit, deployModule, downloadModuleZip, resetGenerate,
     // Files
-    loadFiles, openFile, deleteFile, closeBlockEditor, closeRawEditor,
+    loadFiles, openFile, deleteFile, deleteFolder, closeBlockEditor, closeRawEditor,
     selectBlock, insertBlockAt, doInsertBlock, deleteBlock, addBlock,
     blockAction, applyDrawerEdit, sendDrawerMessage, closeAiDrawer,
     openSectionChat, closeSectionChat, sendScMessage, scChip, deepenSection,
