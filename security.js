@@ -17,7 +17,15 @@ const P002Security = (() => {
     'attack_examples', 'comprehension_check', 'practice_transition',
     'extension', 'session_wrap'
   ];
-  const BUCKET_FOLDER = 'module_intro_web_apps';
+  const ALLOWED_FOLDERS = [
+    'module_intro_web_apps',
+    'module_sql_injection',
+    'module_js_deobfuscation',
+    'module_network_enumeration',
+    'module_web_requests',
+    'modules', // generic fallback
+  ];
+  const BUCKET_FOLDER = 'module_intro_web_apps'; // default
 
   // ==================== HTML ESCAPING ====================
   /**
@@ -83,13 +91,17 @@ const P002Security = (() => {
     }
 
     // Enforce bucket folder prefix
-    if (enforceFolder && !path.startsWith(BUCKET_FOLDER + '/')) {
-      // Auto-prefix if just a filename
-      if (!path.includes('/')) {
-        path = `${BUCKET_FOLDER}/${path}`;
-      } else {
-        console.warn('[Security] Path outside allowed folder:', path);
-        return null;
+    if (enforceFolder) {
+      const folder = path.split('/')[0];
+      const inAllowedFolder = ALLOWED_FOLDERS.includes(folder);
+      if (!inAllowedFolder) {
+        // Auto-prefix if just a filename with no folder
+        if (!path.includes('/')) {
+          path = `${BUCKET_FOLDER}/${path}`;
+        } else {
+          console.warn('[Security] Path outside allowed folders:', path);
+          return null;
+        }
       }
     }
 
@@ -360,6 +372,7 @@ const P002Security = (() => {
     detectPromptInjection,
     checkRateLimit,
     BUCKET_FOLDER,
+    ALLOWED_FOLDERS,
     MAX_ZIP_SIZE,
     MAX_FILE_SIZE,
   };
