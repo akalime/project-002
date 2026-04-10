@@ -170,12 +170,12 @@ window.P002Admin = (() => {
         logGen('ok', '✓ Section ' + String(i+1).padStart(2,'0') + ' done — ' + section.meta.title +
           ' (' + section.meta.minutes + ' min, ' + section.content.length + ' blocks)');
         const remaining = Math.round((total - i - 1) * 35);
-        document.getElementById('genTimeEst').textContent = remaining > 0 ? '~' + remaining + 's remaining · using Sonnet' : 'Almost done...';
+        document.getElementById('genTimeEst').textContent = remaining > 0 ? '~' + remaining + 's remaining · using ' + (document.getElementById('genModel')?.value || 'sonnet') : 'Almost done...';
       } catch(e) {
         logGen('err', '✗ Section ' + (i+1) + ' failed: ' + e.message);
       }
-      // Rate limit buffer — 1500ms between calls
-      await new Promise(r => setTimeout(r, 1500));
+      // Rate limit buffer — 3000ms between calls
+      await new Promise(r => setTimeout(r, 3000));
     }
 
     updateProgress(100, 'Complete', 'All sections generated');
@@ -311,8 +311,8 @@ Include 10-16 content blocks. This may be one part of a larger chapter — focus
       body: JSON.stringify({
         system: systemPrompt,
         messages: [{ role: 'user', content: userMsg }],
-        model: document.getElementById('genModel').value,
-        max_tokens: 4096,
+        model: (document.getElementById('genModel')?.value || 'haiku'),
+        max_tokens: 2000,
       })
     });
     if (!genResponse.ok) throw new Error('API error: ' + genResponse.status);
