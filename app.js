@@ -19,13 +19,14 @@ window.P002App = (() => {
   let readerScrollHandler = null;
 
   // Drawer state
-  let drawerHistory = [];
+  let drawerHistory = [];       // [{role, content}] for drawer conversation
   let selectedText = '';
   let currentDrawerAction = '';
 
-  // Chat state
+  // Chat state (free chat + debrief)
   let chatHistory = [];
-  let chatMode = 'free';
+  let chatMode = 'free';        // 'free' | 'debrief'
+  let currentChallengePassed = false;
 
   // Challenge state
   let currentHintIndex = 0;
@@ -67,9 +68,12 @@ window.P002App = (() => {
     const email = P002Security.sanitizeInput(document.getElementById('authEmail').value.trim());
     const password = document.getElementById('authPassword').value;
     const btn = document.getElementById('authBtn');
+
     if (!email || !password) { showAuthError('Email and password required'); return; }
+
     btn.disabled = true;
     btn.textContent = authMode === 'login' ? 'Logging in...' : 'Creating account...';
+
     try {
       if (authMode === 'login') {
         currentUser = await P002Api.signIn(email, password);
@@ -80,13 +84,16 @@ window.P002App = (() => {
     } catch(e) {
       showAuthError('Error: ' + (e.message || JSON.stringify(e)));
     }
+
     btn.disabled = false;
     btn.textContent = authMode === 'login' ? 'Login' : 'Sign Up';
   }
 
   async function logout() {
     await P002Api.signOut();
-    currentUser = null; sectionData = null; chatHistory = [];
+    currentUser = null;
+    sectionData = null;
+    chatHistory = [];
     document.getElementById('logoutBtn').style.display = 'none';
     document.getElementById('settingsBtn').style.display = 'none';
     document.getElementById('endBtn').style.display = 'none';
@@ -104,29 +111,56 @@ window.P002App = (() => {
     hideAuthError();
   }
 
-  // ==================== HOME ====================
+  // ==================== HOME SCREEN ====================
   const MODULE_INDEX_PATH = 'index.json';
-  const CATEGORY_ICONS = { 'Web Fundamentals':'\ud83c\udf10','Web Exploitation':'\u26a1','Network':'\ud83d\udce1','Defense':'\ud83d\udee1','Systems':'\ud83d\udcbb','Other':'\ud83d\udcda' };
+
+  const CATEGORY_ICONS = {
+    'Web Fundamentals': '??',
+    'Web Exploitation': '⚡',
+    'Network': '??',
+    'Defense': '??',
+    'Systems': '??',
+    'Other': '??',
+  };
 
   async function loadModuleCatalog() {
     const grid = document.getElementById('moduleGrid');
     if (!grid) return;
+
     try {
       let modules = [];
       try {
         const text = await P002Api.downloadFile(MODULE_INDEX_PATH);
-        modules = JSON.parse(text).modules || [];
+        const parsed = JSON.parse(text);
+        modules = parsed.modules || [];
       } catch(e) {
         const items = await P002Api.listBucket('');
-        modules = items.filter(f => !f.metadata && !f.name.startsWith('.')).map(f => ({
-          key: f.name, title: f.name.replace(/module_|_/g,' ').trim(),
-          category:'Other', difficulty:'intermediate', section_count:0, estimated_hours:0, icon:'\ud83d\udcda'
+        const folders = items.filter(f => !f.metadata && !f.name.startsWith('.'));
+        modules = folders.map(f => ({
+          key: f.name,
+          title: f.name.replace(/module_|_/g, ' ').trim(),
+          category: 'Other',
+          difficulty: 'intermediate',
+          section_count: 0,
+          estimated_hours: 0,
+          icon: '??'
         }));
       }
-      if (!modules.length) { grid.innerHTML='<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">No modules found.</div>'; return; }
+
+      if (!modules.length) {
+        grid.innerHTML = '<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">No modules found. Upload content via the admin panel.</div>';
+        return;
+      }
+
       const categories = {};
-      modules.forEach(m => { const c=m.category||'Other'; if(!categories[c]) categories[c]=[]; categories[c].push(m); });
+      modules.forEach(m => {
+        const cat = m.category || 'Other';
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(m);
+      });
+
       grid.innerHTML = '';
+
       Object.entries(categories).forEach(([cat, mods]) => {
         const group = document.createElement('div');
         group.style.cssText = 'margin-bottom:8px;';
@@ -137,29 +171,35 @@ window.P002App = (() => {
         mods.forEach(m => group.appendChild(buildIndexCard(m)));
         grid.appendChild(group);
       });
+
     } catch(e) {
-      grid.innerHTML = '<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">Error: '+P002Security.escapeHtml(e.message)+'</div>';
+      grid.innerHTML = '<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">Error: ' + P002Security.escapeHtml(e.message) + '</div>';
     }
   }
 
   function buildIndexCard(m) {
     const card = document.createElement('div');
     card.style.cssText = 'margin:0 16px 8px;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color 0.15s,transform 0.15s;';
-    const icon = m.icon || CATEGORY_ICONS[m.category] || '\ud83d\udcda';
+
+    const icon = m.icon || CATEGORY_ICONS[m.category] || '??';
+    const secs = m.section_count || 0;
+    const hrs = m.estimated_hours || 0;
     const diff = m.difficulty || 'intermediate';
-    const diffColors = { beginner:'var(--success)', intermediate:'var(--warn)', advanced:'var(--accent)' };
+    const diffColors = { beginner: 'var(--success)', intermediate: 'var(--warn)', advanced: 'var(--accent)' };
+
     card.innerHTML =
-      '<div style="padding:14px 16px;display:flex;align-items:center;gap:14px;">'+
-        '<div style="width:44px;height:44px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(255,77,77,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">'+icon+'</div>'+
-        '<div style="flex:1;min-width:0;">'+
-          '<div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:'+(diffColors[diff]||'var(--warn)')+';margin-bottom:4px;">'+diff+'</div>'+
-          '<div style="font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--text);line-height:1.2;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+P002Security.escapeHtml(m.title)+'</div>'+
-          '<div style="font-size:11px;color:var(--text-muted);">'+(m.section_count>0?m.section_count+' sections':'Loading...')+(m.estimated_hours>0?' \u00b7 '+m.estimated_hours+'h':'')+'</div>'+
-        '</div>'+
-        '<div style="color:var(--text-dim);font-size:16px;">\u203a</div>'+
+      '<div style="padding:14px 16px;display:flex;align-items:center;gap:14px;">' +
+        '<div style="width:44px;height:44px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(255,77,77,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">' + icon + '</div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:' + (diffColors[diff] || 'var(--warn)') + ';margin-bottom:4px;">' + diff + '</div>' +
+          '<div style="font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--text);line-height:1.2;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + P002Security.escapeHtml(m.title) + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);">' + (secs > 0 ? secs + ' sections' : 'Loading...') + (hrs > 0 ? ' · ' + hrs + 'h' : '') + '</div>' +
+        '</div>' +
+        '<div style="color:var(--text-dim);font-size:16px;">›</div>' +
       '</div>';
-    card.addEventListener('mouseenter', () => { card.style.borderColor='var(--border2)'; card.style.transform='translateX(2px)'; });
-    card.addEventListener('mouseleave', () => { card.style.borderColor='var(--border)'; card.style.transform=''; });
+
+    card.addEventListener('mouseenter', () => { card.style.borderColor = 'var(--border2)'; card.style.transform = 'translateX(2px)'; });
+    card.addEventListener('mouseleave', () => { card.style.borderColor = 'var(--border)'; card.style.transform = ''; });
     card.addEventListener('click', () => openModule(m.key || m.module_key));
     return card;
   }
@@ -168,11 +208,13 @@ window.P002App = (() => {
   async function openModule(moduleKey) {
     selectedModule = moduleKey;
     showScreen('moduleScreen');
+
     document.getElementById('moduleDetailTitle').textContent = 'Loading...';
     document.getElementById('moduleDetailDesc').textContent = '';
     document.getElementById('moduleDetailCategory').textContent = '';
     document.getElementById('moduleDetailStats').innerHTML = '';
-    document.getElementById('moduleSectionList').innerHTML = '<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">Loading...</div>';
+    document.getElementById('moduleSectionList').innerHTML = '<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">Loading sections...</div>';
+
     try {
       const text = await P002Api.downloadFile(moduleKey + '/manifest.json');
       const manifest = JSON.parse(text);
@@ -180,37 +222,40 @@ window.P002App = (() => {
       renderModuleDetail(manifest);
     } catch(e) {
       document.getElementById('moduleDetailTitle').textContent = 'Failed to load';
-      document.getElementById('moduleSectionList').innerHTML = '<div style="padding:20px 16px;color:var(--danger);font-size:13px;">'+P002Security.escapeHtml(e.message)+'</div>';
+      document.getElementById('moduleSectionList').innerHTML = '<div style="padding:20px 16px;color:var(--danger);font-size:13px;">' + P002Security.escapeHtml(e.message) + '</div>';
     }
   }
 
   function renderModuleDetail(manifest) {
-    const totalMins = manifest.sections.reduce((a,s) => a+(s.minutes||0), 0);
-    const hours = totalMins>0 ? (totalMins/60).toFixed(1) : (manifest.estimated_hours||'?');
-    const flags = manifest.sections.filter(s=>s.has_flag).length;
-    document.getElementById('moduleDetailCategory').textContent = (manifest.category||'')+(manifest.difficulty?' \u00b7 '+manifest.difficulty:'');
+    const totalMins = manifest.sections.reduce((a, s) => a + (s.minutes || 0), 0);
+    const hours = totalMins > 0 ? (totalMins / 60).toFixed(1) : (manifest.estimated_hours || '?');
+    const flags = manifest.sections.filter(s => s.has_flag).length;
+
+    document.getElementById('moduleDetailCategory').textContent = (manifest.category || '') + (manifest.difficulty ? ' · ' + manifest.difficulty : '');
     document.getElementById('moduleDetailTitle').textContent = manifest.title;
-    document.getElementById('moduleDetailDesc').textContent = manifest.description||'';
+    document.getElementById('moduleDetailDesc').textContent = manifest.description || '';
     document.getElementById('moduleDetailStats').innerHTML =
-      '<div class="module-stat"><span class="module-stat-value">'+manifest.sections.length+'</span><span class="module-stat-label">Sections</span></div>'+
-      '<div class="module-stat"><span class="module-stat-value">'+hours+'h</span><span class="module-stat-label">Estimated</span></div>'+
-      (flags>0?'<div class="module-stat"><span class="module-stat-value">'+flags+'</span><span class="module-stat-label">Flags</span></div>':'');
+      '<div class="module-stat"><span class="module-stat-value">' + manifest.sections.length + '</span><span class="module-stat-label">Sections</span></div>' +
+      '<div class="module-stat"><span class="module-stat-value">' + hours + 'h</span><span class="module-stat-label">Estimated</span></div>' +
+      (flags > 0 ? '<div class="module-stat"><span class="module-stat-value">' + flags + '</span><span class="module-stat-label">Flags</span></div>' : '');
+
     const list = document.getElementById('moduleSectionList');
     list.innerHTML = '';
-    manifest.sections.forEach((s,i) => {
+
+    manifest.sections.forEach((s, i) => {
       const row = document.createElement('div');
-      row.className = 'section-row'+(s.has_flag?' has-flag':'');
+      row.className = 'section-row' + (s.has_flag ? ' has-flag' : '');
       row.innerHTML =
-        '<div class="section-num">'+String(i+1).padStart(2,'0')+'</div>'+
-        '<div class="section-info">'+
-          '<div class="section-title">'+P002Security.escapeHtml(s.title)+'</div>'+
-          '<div class="section-meta-row">'+
-            '<span class="section-time">\u23f1 '+(s.minutes||'?')+' min</span>'+
-            '<span class="section-diff '+(s.difficulty||'beginner')+'">'+(s.difficulty||'')+'</span>'+
-          '</div>'+
-        '</div>'+
-        '<div class="section-flag">\u2691</div>'+
-        '<div class="section-chevron">\u203a</div>';
+        '<div class="section-num">' + String(i + 1).padStart(2, '0') + '</div>' +
+        '<div class="section-info">' +
+          '<div class="section-title">' + P002Security.escapeHtml(s.title) + '</div>' +
+          '<div class="section-meta-row">' +
+            '<span class="section-time">⏱ ' + (s.minutes || '?') + ' min</span>' +
+            '<span class="section-diff ' + (s.difficulty || 'beginner') + '">' + (s.difficulty || '') + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="section-flag">⚑</div>' +
+        '<div class="section-chevron">›</div>';
       row.addEventListener('click', () => openSectionPreview(s, i, manifest));
       list.appendChild(row);
     });
@@ -220,58 +265,93 @@ window.P002App = (() => {
     currentSectionMeta = sectionMeta;
     selectedSection = manifest.module_key + '/' + sectionMeta.file;
     sectionData = null;
+
     document.getElementById('sectionBackLabel').textContent = manifest.title;
     document.getElementById('sectionPreviewMeta').textContent =
-      'Section '+(idx+1)+' of '+manifest.sections.length+' \u00b7 '+(sectionMeta.difficulty||'')+' \u00b7 '+(sectionMeta.minutes||'?')+' min';
+      'Section ' + (idx + 1) + ' of ' + manifest.sections.length +
+      ' · ' + (sectionMeta.difficulty || '') +
+      ' · ' + (sectionMeta.minutes || '?') + ' min';
     document.getElementById('sectionPreviewTitle').textContent = sectionMeta.title;
-    document.getElementById('sectionPreviewDesc').textContent = sectionMeta.description||'';
+    document.getElementById('sectionPreviewDesc').textContent = sectionMeta.description || '';
+
     const body = document.getElementById('sectionPreviewBody');
     body.innerHTML = '';
+
     if (sectionMeta.has_flag) {
       const box = document.createElement('div');
       box.className = 'section-challenge-box';
-      box.innerHTML = '<div class="section-challenge-label">\u2691 Practice Challenge included</div><div class="section-challenge-text">'+P002Security.escapeHtml(sectionMeta.practice_question||'Hands-on challenge at the end')+'</div>';
+      box.innerHTML =
+        '<div class="section-challenge-label">⚑ Practice Challenge included</div>' +
+        '<div class="section-challenge-text">' + P002Security.escapeHtml(sectionMeta.practice_question || 'Hands-on challenge at the end of this section') + '</div>';
       body.appendChild(box);
     }
+
     showScreen('sectionScreen');
+
     const btn = document.getElementById('sectionStartBtn');
     const status = document.getElementById('sectionStartStatus');
     btn.disabled = true;
     status.textContent = 'Loading section...';
+
     try {
       const text = await P002Api.downloadFile(selectedSection);
       const validation = P002Security.validateLessonJson(text);
-      if (!validation.ok) { status.textContent = '\u2717 ' + validation.errors[0]; return; }
+      if (!validation.ok) {
+        status.textContent = '✗ ' + validation.errors[0];
+        return;
+      }
       sectionData = validation.data;
       btn.disabled = false;
       status.textContent = '';
-      btn.textContent = validation.schema === 'reader' ? 'Start Reading \u2192' : 'Start Session \u2192';
+
+      // Update button text based on schema
+      btn.textContent = validation.schema === 'reader' ? 'Start Reading →' : 'Start Session →';
     } catch(e) {
-      status.textContent = '\u2717 Failed to load: ' + P002Security.escapeHtml(e.message);
+      status.textContent = '✗ Failed to load: ' + P002Security.escapeHtml(e.message);
     }
   }
 
   function backToHome() { currentModule = null; showScreen('homeScreen'); }
   function backToModule() { currentSectionMeta = null; sectionData = null; showScreen('moduleScreen'); }
-  function backToSectionPreview() { closeDrawer(); removeTextSelectionHandler(); showScreen('sectionScreen'); }
+  function backToSectionPreview() {
+    closeDrawer();
+    removeTextSelectionHandler();
+    showScreen('sectionScreen');
+  }
   function showAdmin() { window.location.href = 'admin.html'; }
 
   // ==================== START READING ====================
   async function startReading() {
     if (!sectionData) return;
-    // Detect schema directly from loaded data \u2014 avoid re-serializing which can corrupt validation
-    const isReader = sectionData.meta && sectionData.content && Array.isArray(sectionData.content);
-    if (!isReader) { startLegacySession(); return; }
+
+    const validation = P002Security.validateLessonJson(JSON.stringify(sectionData));
+
+    // Legacy section — fall back to old chat-based session
+    if (validation.schema === 'legacy') {
+      startLegacySession();
+      return;
+    }
+
+    // New reader schema
     const meta = sectionData.meta;
-    document.getElementById('readerChapter').textContent = 'Section '+meta.section+' of '+meta.total_sections+' \u00b7 '+meta.module;
+    document.getElementById('readerChapter').textContent =
+      'Section ' + meta.section + ' of ' + meta.total_sections + ' · ' + meta.module;
     document.getElementById('readerTitle').textContent = meta.title;
     document.getElementById('readerProgressFill').style.width = '0%';
+
     renderReaderContent();
     showScreen('readerScreen');
     document.getElementById('endBtn').style.display = 'block';
     document.getElementById('settingsBtn').style.display = 'none';
+
     initTextSelection();
-    try { currentSessionId = await P002Api.createSession(meta.section, meta.module); } catch(e) {}
+
+    // Create session for progress tracking
+    try {
+      currentSessionId = await P002Api.createSession(meta.section, meta.module);
+    } catch(e) {
+      console.warn('Session creation failed:', e.message);
+    }
   }
 
   function endReading() {
@@ -282,31 +362,38 @@ window.P002App = (() => {
     showScreen('sectionScreen');
   }
 
-  // ==================== READER RENDERER ====================
+  // ==================== READER CONTENT RENDERER ====================
   function renderReaderContent() {
     const body = document.getElementById('readerBody');
     body.innerHTML = '';
-    (sectionData.content || []).forEach(block => {
+
+    const blocks = sectionData.content || [];
+
+    blocks.forEach(block => {
       const el = renderBlock(block);
       if (el) body.appendChild(el);
     });
+
+    // Challenge CTA at end if challenge exists
     if (sectionData.challenge) {
-      const ch = sectionData.challenge;
       const cta = document.createElement('div');
       cta.className = 'reader-challenge-cta';
       cta.innerHTML =
-        '<div class="reader-cta-label">End of section</div>'+
-        '<div class="reader-cta-title">'+P002Security.escapeHtml(ch.title||'Practice Challenge')+'</div>'+
-        '<div class="reader-cta-desc">'+P002Security.escapeHtml(ch.description||'Apply what you just read.')+'</div>'+
-        '<button class="reader-cta-btn" onclick="P002App.openChallenge()">\ud83c\udff4 Start Challenge \u2192</button>'+
+        '<div class="reader-cta-label">End of section</div>' +
+        '<div class="reader-cta-title">' + P002Security.escapeHtml(sectionData.challenge.title || 'Practice Challenge') + '</div>' +
+        '<div class="reader-cta-desc">' + P002Security.escapeHtml(sectionData.challenge.description || 'Apply what you just read in a hands-on challenge.') + '</div>' +
+        '<button class="reader-cta-btn" onclick="P002App.openChallenge()">?? Start Challenge →</button>' +
         '<div class="reader-cta-skip" onclick="P002App.skipChallenge()">Skip for now</div>';
       body.appendChild(cta);
     }
-    const pf = document.getElementById('readerProgressFill');
+
+    // Track read progress on scroll
+    const progressFill = document.getElementById('readerProgressFill');
     readerScrollHandler = () => {
-      const pct = body.scrollHeight - body.clientHeight > 0
-        ? Math.min(100, (body.scrollTop / (body.scrollHeight - body.clientHeight)) * 100) : 0;
-      pf.style.width = pct + '%';
+      const scrollTop = body.scrollTop;
+      const scrollHeight = body.scrollHeight - body.clientHeight;
+      const pct = scrollHeight > 0 ? Math.min(100, (scrollTop / scrollHeight) * 100) : 0;
+      progressFill.style.width = pct + '%';
     };
     body.addEventListener('scroll', readerScrollHandler);
   }
@@ -322,6 +409,7 @@ window.P002App = (() => {
       case 'body': {
         const el = document.createElement('div');
         el.className = 'content-body';
+        // Allow basic markdown: **bold**, `code`
         el.innerHTML = formatBodyText(block.text || '');
         return el;
       }
@@ -329,35 +417,47 @@ window.P002App = (() => {
         const el = document.createElement('div');
         el.className = 'content-code';
         el.textContent = block.text || '';
+        if (block.lang) {
+          el.dataset.lang = block.lang;
+        }
         return el;
       }
       case 'callout': {
         const el = document.createElement('div');
         el.className = 'content-callout';
-        el.innerHTML = '<div class="content-callout-icon">\u26a1</div><div class="content-callout-text">'+formatBodyText(block.text||'')+'</div>';
+        el.innerHTML =
+          '<div class="content-callout-icon">⚡</div>' +
+          '<div class="content-callout-text">' + formatBodyText(block.text || '') + '</div>';
         return el;
       }
-      default: return null;
+      default:
+        return null;
     }
   }
 
   function formatBodyText(text) {
-    let s = P002Security.escapeHtml(text);
-    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-         .replace(/`([^`]+)`/g, '<code>$1</code>')
-         .replace(/\n\n/g, '</p><p>')
-         .replace(/\n/g, '<br>');
-    return s;
+    // Escape HTML first
+    let safe = P002Security.escapeHtml(text);
+    // Then apply formatting
+    safe = safe
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>');
+    return safe;
   }
 
   function removeTextSelectionHandler() {
     const body = document.getElementById('readerBody');
-    if (body && readerScrollHandler) { body.removeEventListener('scroll', readerScrollHandler); readerScrollHandler = null; }
+    if (body && readerScrollHandler) {
+      body.removeEventListener('scroll', readerScrollHandler);
+      readerScrollHandler = null;
+    }
     document.removeEventListener('selectionchange', onSelectionChange);
     hidePopup();
   }
 
-  // ==================== TEXT SELECTION ====================
+  // ==================== TEXT SELECTION + POPUP ====================
   let selectionChangeTimeout = null;
 
   function initTextSelection() {
@@ -367,13 +467,25 @@ window.P002App = (() => {
   function onSelectionChange() {
     clearTimeout(selectionChangeTimeout);
     selectionChangeTimeout = setTimeout(() => {
-      const sel = window.getSelection();
-      const text = sel ? sel.toString().trim() : '';
-      if (!text || text.length < 3) { hidePopup(); return; }
+      const selection = window.getSelection();
+      const text = selection ? selection.toString().trim() : '';
+
+      if (!text || text.length < 3) {
+        hidePopup();
+        return;
+      }
+
+      // Only trigger if selection is inside reader body
       const readerBody = document.getElementById('readerBody');
       if (!readerBody) return;
-      const range = sel.getRangeAt(0);
-      if (!readerBody.contains(range.commonAncestorContainer)) { hidePopup(); return; }
+
+      const range = selection.getRangeAt(0);
+      const container = range.commonAncestorContainer;
+      if (!readerBody.contains(container)) {
+        hidePopup();
+        return;
+      }
+
       selectedText = text;
       showPopupNearSelection(range);
     }, 200);
@@ -382,81 +494,117 @@ window.P002App = (() => {
   function showPopupNearSelection(range) {
     const popup = document.getElementById('askAiPopup');
     const rect = range.getBoundingClientRect();
-    let top = rect.top - 48 - 44;
+
+    let top = rect.top - 48 - 10; // above selection, account for header
     let left = rect.left;
-    const popupWidth = 260;
-    if (left + popupWidth > window.innerWidth - 10) left = window.innerWidth - popupWidth - 10;
+
+    // Keep popup on screen
+    const popupWidth = 280;
+    if (left + popupWidth > window.innerWidth - 10) {
+      left = window.innerWidth - popupWidth - 10;
+    }
     if (left < 10) left = 10;
-    if (top < 58) top = rect.bottom - 48 + 10;
+
+    // If too close to top, show below
+    if (top < 58) {
+      top = rect.bottom - 48 + 10;
+      // Move caret to top
+      popup.style.setProperty('--caret-top', 'none');
+    }
+
     popup.style.top = top + 'px';
     popup.style.left = left + 'px';
     popup.classList.add('visible');
   }
 
-  function hidePopup() { document.getElementById('askAiPopup').classList.remove('visible'); }
-
-  async function callHaiku(systemPrompt, messages) {
-    // Use P002Api.callClaude with haiku model — correct URL and headers
-    return await P002Api.callClaude(systemPrompt, messages.slice(-4), null, 'haiku');
+  function hidePopup() {
+    document.getElementById('askAiPopup').classList.remove('visible');
   }
 
   async function handlePopupAction(action) {
     if (!selectedText) return;
     hidePopup();
     window.getSelection()?.removeAllRanges();
-    if (action === 'chat') { openFreeChat(selectedText); return; }
-    const labels = { explain:'Explain', example:'Example', deeper:'Go Deeper' };
+
+    if (action === 'chat') {
+      // Open full chat with context
+      openFreeChat(selectedText);
+      return;
+    }
+
+    // Open drawer
+    const labels = {
+      explain: 'Explain',
+      example: 'Example',
+      deeper: 'Go Deeper'
+    };
+
     currentDrawerAction = action;
     drawerHistory = [];
+
     document.getElementById('drawerMode').textContent = labels[action] || 'Ask AI';
-    document.getElementById('drawerContext').textContent = selectedText.slice(0,60)+(selectedText.length>60?'...':'');
-    const qw = document.getElementById('drawerQuoteWrap');
-    qw.style.display = 'block';
-    document.getElementById('drawerQuote').textContent = '"'+selectedText.slice(0,120)+(selectedText.length>120?'...':'')+'"';
+    document.getElementById('drawerContext').textContent = selectedText.slice(0, 60) + (selectedText.length > 60 ? '...' : '');
+
+    const quoteWrap = document.getElementById('drawerQuoteWrap');
+    quoteWrap.style.display = 'block';
+    document.getElementById('drawerQuote').textContent = '"' + selectedText.slice(0, 120) + (selectedText.length > 120 ? '...' : '') + '"';
+
     document.getElementById('drawerResponse').textContent = '';
     document.getElementById('drawerChips').innerHTML = '';
     document.getElementById('drawerTyping').style.display = 'flex';
+
     openDrawer();
+
+    // Call Claude
+    const systemPrompt = buildDrawerSystemPrompt(action);
+    const userMsg = buildDrawerUserMessage(action, selectedText);
+
     try {
-      const sp = buildDrawerSystemPrompt(action);
-      const um = buildDrawerUserMessage(action, selectedText);
-      const reply = await callHaiku(sp, [{role:'user',content:um}]);
+      const reply = await P002Api.callClaude(systemPrompt, [{ role: 'user', content: userMsg }]);
       document.getElementById('drawerTyping').style.display = 'none';
       document.getElementById('drawerResponse').innerHTML = formatBodyText(reply);
-      drawerHistory = [{role:'user',content:um},{role:'assistant',content:reply}];
+      drawerHistory = [
+        { role: 'user', content: userMsg },
+        { role: 'assistant', content: reply }
+      ];
       renderDrawerChips();
     } catch(e) {
       document.getElementById('drawerTyping').style.display = 'none';
-      document.getElementById('drawerResponse').textContent = 'Error: '+e.message;
+      document.getElementById('drawerResponse').textContent = 'Error: ' + e.message;
     }
   }
 
   function buildDrawerSystemPrompt(action) {
-    return 'You are an AI tutor for cybersecurity. Section: "'+(sectionData?.meta?.title||'')+'". Context: '+(sectionData?.ai_context||'')+'. Be concise \u2014 2-4 sentences max unless a code example is needed.';
+    const sectionTitle = sectionData?.meta?.title || '';
+    const aiContext = sectionData?.ai_context || '';
+    return `You are an AI tutor helping a student learn cybersecurity. The student is reading a section titled "${sectionTitle}". Context: ${aiContext}
+
+Be concise and direct. Responses should be 2-4 sentences max unless a code example is needed. No filler, no preamble.`;
   }
 
   function buildDrawerUserMessage(action, text) {
     const prompts = {
-      explain: 'Explain this simply: "'+text+'"',
-      example: 'Give a concrete real-world example of: "'+text+'"',
-      deeper: 'Go deeper on this \u2014 what would a beginner miss?: "'+text+'"'
+      explain: `Explain this in simple terms: "${text}"`,
+      example: `Give me a concrete real-world example of: "${text}"`,
+      deeper: `Go deeper on this concept: "${text}" — what's the technical detail a beginner would miss?`
     };
-    return prompts[action] || 'Tell me about: "'+text+'"';
+    return prompts[action] || `Tell me about: "${text}"`;
   }
 
   function renderDrawerChips() {
     const chips = document.getElementById('drawerChips');
+    const options = ['Show me in code', 'Real attack example', 'Why does this matter', 'Test me on this'];
     chips.innerHTML = '';
-    ['Show me in code','Real attack example','Why does this matter','Test me'].forEach(opt => {
-      const c = document.createElement('div');
-      c.className = 'drawer-chip';
-      c.textContent = opt;
-      c.onclick = () => sendDrawerChipText(opt);
-      chips.appendChild(c);
+    options.forEach(opt => {
+      const chip = document.createElement('div');
+      chip.className = 'drawer-chip';
+      chip.textContent = opt;
+      chip.onclick = () => sendDrawerChip(opt);
+      chips.appendChild(chip);
     });
   }
 
-  async function sendDrawerChipText(text) {
+  async function sendDrawerChip(text) {
     document.getElementById('drawerChips').innerHTML = '';
     await sendDrawerMessageText(text);
   }
@@ -472,21 +620,28 @@ window.P002App = (() => {
   async function sendDrawerMessageText(text) {
     document.getElementById('drawerTyping').style.display = 'flex';
     document.getElementById('drawerSendBtn').disabled = true;
-    drawerHistory.push({role:'user',content:text});
+
+    drawerHistory.push({ role: 'user', content: text });
+
+    // Append user message to response area
     const responseEl = document.getElementById('drawerResponse');
-    responseEl.innerHTML += '<div style="margin-top:10px;padding:8px 10px;background:rgba(255,77,77,0.08);border-radius:8px;font-size:12px;color:#ccc;">'+P002Security.escapeHtml(text)+'</div>';
+    responseEl.innerHTML += '<div style="margin-top:10px;padding:8px 10px;background:rgba(255,77,77,0.08);border-radius:8px;font-size:12px;color:#ccc;">' + P002Security.escapeHtml(text) + '</div>';
+
     try {
-      const sp = buildDrawerSystemPrompt(currentDrawerAction);
-      const reply = await callHaiku(sp, drawerHistory.slice(-4));
+      const systemPrompt = buildDrawerSystemPrompt(currentDrawerAction);
+      const reply = await P002Api.callClaude(systemPrompt, drawerHistory.slice(-10));
       document.getElementById('drawerTyping').style.display = 'none';
-      drawerHistory.push({role:'assistant',content:reply});
-      responseEl.innerHTML += '<div style="margin-top:8px;">'+formatBodyText(reply)+'</div>';
+      drawerHistory.push({ role: 'assistant', content: reply });
+      responseEl.innerHTML += '<div style="margin-top:8px;">' + formatBodyText(reply) + '</div>';
       renderDrawerChips();
     } catch(e) {
       document.getElementById('drawerTyping').style.display = 'none';
-      responseEl.innerHTML += '<div style="color:var(--danger);font-size:12px;margin-top:8px;">Error: '+P002Security.escapeHtml(e.message)+'</div>';
+      responseEl.innerHTML += '<div style="color:var(--danger);font-size:12px;margin-top:8px;">Error: ' + P002Security.escapeHtml(e.message) + '</div>';
     }
+
     document.getElementById('drawerSendBtn').disabled = false;
+
+    // Scroll drawer to bottom
     const scroll = document.getElementById('drawerScroll');
     scroll.scrollTop = scroll.scrollHeight;
   }
@@ -506,38 +661,55 @@ window.P002App = (() => {
   function openFreeChat(contextText) {
     chatMode = 'free';
     chatHistory = [];
+
     document.getElementById('chatHeaderLabel').textContent = 'AI Tutor';
     document.getElementById('chatHeaderTitle').textContent = sectionData?.meta?.title || 'Free chat';
     document.getElementById('debriefBanner').style.display = 'none';
     document.getElementById('chatContinueBtn').style.display = 'none';
-    document.getElementById('messages').innerHTML = '';
-    document.getElementById('messages').style.paddingTop = '';
+
+    const msgs = document.getElementById('messages');
+    msgs.innerHTML = '';
+
     showScreen('chatScreen');
-    const sp = buildFreeChatSystemPrompt();
-    const um = contextText
-      ? 'I want to ask about this: "'+contextText+'"'
-      : 'Hi, I just finished reading the section and want to ask some questions.';
-    chatHistory.push({role:'user',content:um});
-    callClaude(sp, chatHistory);
+
+    // Open with context if text was selected
+    if (contextText) {
+      const systemPrompt = buildFreeChatSystemPrompt();
+      const userMsg = 'I want to chat about this: "' + contextText + '"';
+      addMessage('user', userMsg);
+      chatHistory.push({ role: 'user', content: userMsg });
+      callClaude(systemPrompt, chatHistory);
+    } else {
+      // Open with greeting
+      const systemPrompt = buildFreeChatSystemPrompt();
+      callClaude(systemPrompt, [{ role: 'user', content: 'Hi, I just read the section and want to ask some questions.' }]);
+    }
   }
 
   function closeFreeChat() {
-    document.getElementById('debriefBanner').style.display = 'none';
     showScreen('readerScreen');
+    document.getElementById('debriefBanner').style.display = 'none';
   }
 
   function buildFreeChatSystemPrompt() {
-    return 'You are an AI tutor. The student just read: "'+(sectionData?.meta?.title||'')+'". Context: '+(sectionData?.ai_context||'')+'. Answer questions clearly. Keep responses focused on the section content.';
+    const title = sectionData?.meta?.title || '';
+    const aiContext = sectionData?.ai_context || '';
+    return `You are an AI tutor for a cybersecurity learning platform. The student has just read a section titled "${title}". Context: ${aiContext}
+
+Answer questions clearly and concisely. If they ask something off-topic, gently redirect to the section content. Don't be preachy. Keep responses focused.`;
   }
 
-  // ==================== CHALLENGE ====================
+  // ==================== CHALLENGE SCREEN ====================
   function openChallenge() {
     if (!sectionData?.challenge) return;
     const ch = sectionData.challenge;
     currentHintIndex = 0;
+    currentChallengePassed = false;
+
     document.getElementById('challengeBackLabel').textContent = sectionData.meta?.title || 'Back to reading';
     document.getElementById('challengeTitle').textContent = ch.title || 'Practice Challenge';
     document.getElementById('challengeDesc').textContent = ch.description || '';
+
     renderChallengeBody(ch);
     showScreen('challengeScreen');
   }
@@ -545,45 +717,54 @@ window.P002App = (() => {
   function renderChallengeBody(ch) {
     const body = document.getElementById('challengeBody');
     body.innerHTML = '';
+
+    // Query display
     if (ch.query) {
-      const qEl = document.createElement('div');
-      qEl.className = 'challenge-query';
-      qEl.textContent = ch.query;
-      body.appendChild(qEl);
+      const queryEl = document.createElement('div');
+      queryEl.className = 'challenge-query';
+      queryEl.textContent = ch.query;
+      body.appendChild(queryEl);
     }
-    if (ch.query) {
+
+    // Simulated target app (login form for SQLi)
+    if (ch.sim_type === 'login' || ch.query) {
       const sim = document.createElement('div');
       sim.className = 'target-app';
       sim.innerHTML =
-        '<div class="target-app-bar">'+
-          '<div class="target-dot" style="background:#ff5f57"></div>'+
-          '<div class="target-dot" style="background:#febc2e"></div>'+
-          '<div class="target-dot" style="background:#28c840"></div>'+
-          '<div class="target-url">vuln-lab.local/login</div>'+
-        '</div>'+
-        '<div class="target-app-body">'+
-          '<div class="target-label">Username</div>'+
-          '<input class="target-input" id="simUser" value="admin" readonly />'+
-          '<div class="target-label" style="margin-top:8px;">Password</div>'+
-          '<input class="target-input" id="simPass" placeholder="Enter password..." />'+
-          '<button class="target-submit-btn" style="margin-top:10px;" onclick="P002App.trySimLogin()">Login</button>'+
-          '<div id="simResult" style="margin-top:10px;font-size:12px;text-align:center;min-height:18px;"></div>'+
+        '<div class="target-app-bar">' +
+          '<div class="target-dot" style="background:#ff5f57"></div>' +
+          '<div class="target-dot" style="background:#febc2e"></div>' +
+          '<div class="target-dot" style="background:#28c840"></div>' +
+          '<div class="target-url">vuln-lab.local/login</div>' +
+        '</div>' +
+        '<div class="target-app-body">' +
+          '<div class="target-label">Username</div>' +
+          '<input class="target-input" id="simUser" value="admin" readonly />' +
+          '<div class="target-label" style="margin-top:8px;">Password</div>' +
+          '<input class="target-input" id="simPass" placeholder="Enter password..." />' +
+          '<button class="target-submit-btn" style="margin-top:10px;" onclick="P002App.trySimLogin()">Login</button>' +
+          '<div id="simResult" style="margin-top:10px;font-size:12px;text-align:center;min-height:18px;"></div>' +
         '</div>';
       body.appendChild(sim);
     }
+
+    // Flag submission area
     const flagArea = document.createElement('div');
     flagArea.className = 'flag-area';
     flagArea.innerHTML =
-      '<div class="flag-label">\ud83c\udff4 Your Payload</div>'+
-      '<input class="flag-input" id="flagInput" placeholder="Enter your payload..." onkeydown="if(event.key===&#39;Enter&#39;)P002App.submitFlag()" />'+
+      '<div class="flag-label">?? Your Payload</div>' +
+      '<input class="flag-input" id="flagInput" placeholder="Enter your payload..." ' +
+        'onkeydown="if(event.key===&#39;Enter&#39;)P002App.submitFlag()" />' +
       '<button class="flag-submit" onclick="P002App.submitFlag()">Submit Flag</button>';
     body.appendChild(flagArea);
+
+    // Help row
     const helpRow = document.createElement('div');
     helpRow.className = 'challenge-help-row';
     helpRow.innerHTML =
-      '<button class="challenge-help-btn" onclick="P002App.backToReader()">\ud83d\udcd6 Review</button>'+
-      '<button class="challenge-help-btn ai" onclick="P002App.showHint()">\ud83d\udca1 Hint</button>'+
-      '<button class="challenge-help-btn ai" onclick="P002App.openChallengeChat()">\ud83d\udcac Discuss</button>';
+      '<button class="challenge-help-btn" onclick="P002App.backToReader()">?? Review</button>' +
+      '<button class="challenge-help-btn ai" onclick="P002App.showHint()">?? Hint</button>' +
+      '<button class="challenge-help-btn ai" onclick="P002App.openChallengeChat()">?? Discuss</button>';
     body.appendChild(helpRow);
   }
 
@@ -591,14 +772,17 @@ window.P002App = (() => {
     const pass = document.getElementById('simPass')?.value || '';
     const result = document.getElementById('simResult');
     const flag = sectionData?.challenge?.flag || '';
+
+    // Check if the payload is the flag or contains injection
     const isInjection = pass.includes("'") && (pass.toLowerCase().includes('or') || pass.includes('1=1') || pass.includes('--'));
+
     if (pass.toLowerCase().trim() === flag.toLowerCase().trim() || isInjection) {
-      result.innerHTML = '<span style="color:#4ade80;">\u26a0\ufe0f SQL Error \u2014 Login bypassed!</span>';
+      result.innerHTML = '<span style="color:#4ade80;">⚠️ SQL Error — Login bypassed! Access granted.</span>';
       document.getElementById('flagInput').value = pass;
     } else if (pass === 'admin123' || pass === 'password') {
-      result.innerHTML = '<span style="color:#4ade80;">\u2713 Login successful</span>';
+      result.innerHTML = '<span style="color:#4ade80;">✓ Login successful (correct credentials)</span>';
     } else {
-      result.innerHTML = '<span style="color:#ff4d4d;">\u2717 Invalid credentials</span>';
+      result.innerHTML = '<span style="color:#ff4d4d;">✗ Invalid credentials</span>';
     }
   }
 
@@ -606,43 +790,74 @@ window.P002App = (() => {
     const input = document.getElementById('flagInput');
     const submitted = P002Security.sanitizeInput(input.value.trim(), 200);
     const correct = sectionData?.challenge?.flag || '';
+
     if (!submitted) return;
-    const norm = s => s.replace(/\s/g,'').toLowerCase();
-    if (norm(submitted) === norm(correct)) {
+
+    if (submitted.toLowerCase() === correct.toLowerCase()) {
       flagCaptured(submitted);
     } else {
-      showToast('Incorrect \u2014 try again', false);
+      // Fuzzy match for common variations
+      const normalizedSubmit = submitted.replace(/\s/g, '').toLowerCase();
+      const normalizedCorrect = correct.replace(/\s/g, '').toLowerCase();
+      if (normalizedSubmit === normalizedCorrect) {
+        flagCaptured(submitted);
+        return;
+      }
+      showToast('Incorrect — try again', false);
       input.style.borderColor = 'var(--danger)';
       setTimeout(() => input.style.borderColor = '', 1500);
     }
   }
 
   async function flagCaptured(payload) {
-    showToast('\ud83c\udff4 Flag captured!', true);
-    try { if (currentSessionId) await P002Api.captureFlag(currentSessionId); } catch(e) {}
+    currentChallengePassed = true;
+    showToast('?? Flag captured!', true);
+
+    try {
+      if (currentSessionId) await P002Api.captureFlag(currentSessionId);
+    } catch(e) { /* non-critical */ }
+
+    // Go to debrief
     openDebrief(payload);
   }
 
-  function backToReader() { closeHintDrawer(); showScreen('readerScreen'); }
-  function skipChallenge() { showScreen('homeScreen'); }
+  function backToReader() {
+    closeHintDrawer();
+    showScreen('readerScreen');
+  }
 
-  // ==================== HINTS ====================
+  function skipChallenge() {
+    showScreen('homeScreen');
+  }
+
+  // ==================== HINT SYSTEM ====================
   function showHint() {
     const hints = sectionData?.challenge?.hints || [];
-    if (!hints.length) { showToast('No hints available', false); return; }
-    const hint = hints[currentHintIndex] || hints[hints.length-1];
-    document.getElementById('hintLabel').textContent = 'Hint '+(currentHintIndex+1)+' of '+hints.length;
+    if (!hints.length) {
+      showToast('No hints available', false);
+      return;
+    }
+
+    const hint = hints[currentHintIndex] || hints[hints.length - 1];
+    document.getElementById('hintLabel').textContent = 'Hint ' + (currentHintIndex + 1) + ' of ' + hints.length;
     document.getElementById('hintText').innerHTML = formatBodyText(hint);
+
     document.getElementById('hintDrawer').classList.add('visible');
   }
 
   function nextHint() {
     const hints = sectionData?.challenge?.hints || [];
-    if (currentHintIndex < hints.length-1) { currentHintIndex++; showHint(); }
-    else closeHintDrawer();
+    if (currentHintIndex < hints.length - 1) {
+      currentHintIndex++;
+      showHint();
+    } else {
+      closeHintDrawer();
+    }
   }
 
-  function closeHintDrawer() { document.getElementById('hintDrawer').classList.remove('visible'); }
+  function closeHintDrawer() {
+    document.getElementById('hintDrawer').classList.remove('visible');
+  }
 
   function openChallengeChat() {
     chatMode = 'free';
@@ -651,30 +866,61 @@ window.P002App = (() => {
     document.getElementById('chatHeaderTitle').textContent = 'Challenge Help';
     document.getElementById('debriefBanner').style.display = 'none';
     document.getElementById('chatContinueBtn').style.display = 'none';
-    document.getElementById('messages').innerHTML = '';
-    document.getElementById('messages').style.paddingTop = '';
+
+    const msgs = document.getElementById('messages');
+    msgs.innerHTML = '';
     showScreen('chatScreen');
-    const sp = 'You are an AI tutor. Help the student with this challenge: "'+(sectionData?.challenge?.title||'')+'". Give hints without giving away the answer. Context: '+(sectionData?.ai_context||'');
-    callClaude(sp, [{role:'user',content:"I'm stuck on the challenge, give me a hint."}]);
+
+    const systemPrompt = buildChallengeChatSystemPrompt();
+    callClaude(systemPrompt, [{ role: 'user', content: "I'm stuck on the challenge. Give me a hint without giving away the answer." }]);
+  }
+
+  function buildChallengeChatSystemPrompt() {
+    const ch = sectionData?.challenge;
+    const aiContext = sectionData?.ai_context || '';
+    return `You are an AI tutor helping a student with a cybersecurity challenge. Context: ${aiContext}
+
+Challenge: ${ch?.title || ''}. Description: ${ch?.description || ''}
+
+Give hints that guide without giving the answer directly. If they're really stuck after 3 messages, you can give more direct guidance. Keep responses concise.`;
   }
 
   // ==================== DEBRIEF ====================
   function openDebrief(payload) {
     chatMode = 'debrief';
     chatHistory = [];
+
     document.getElementById('chatHeaderLabel').textContent = 'Debrief';
     document.getElementById('chatHeaderTitle').textContent = sectionData?.meta?.title || 'Section complete';
     document.getElementById('chatContinueBtn').style.display = 'block';
+
+    // Show debrief banner
     document.getElementById('debriefBanner').style.display = 'block';
-    document.getElementById('debriefBannerTitle').textContent = 'Flag captured \u2014 ' + P002Security.escapeHtml(payload);
-    document.getElementById('debriefBannerSub').textContent = (sectionData?.meta?.title||'')+' complete';
-    document.getElementById('messages').innerHTML = '';
-    document.getElementById('messages').style.paddingTop = '60px';
+    document.getElementById('debriefBannerTitle').textContent = 'Flag captured — ' + P002Security.escapeHtml(payload);
+    document.getElementById('debriefBannerSub').textContent = (sectionData?.meta?.title || '') + ' complete';
+
+    const msgs = document.getElementById('messages');
+    msgs.innerHTML = '';
     showScreen('chatScreen');
-    const sp = 'You are an AI tutor debriefing a student. Section: "'+(sectionData?.meta?.title||'')+'". Context: '+(sectionData?.ai_context||'')+'. The student used payload: "'+payload+'". Explain in 3-4 sentences what happened and why it worked. Then offer to go deeper. Be direct.';
-    const um = 'I just captured the flag with: "'+payload+'". Debrief me.';
-    chatHistory.push({role:'user',content:um});
-    callClaude(sp, chatHistory);
+
+    // Adjust messages padding to account for debrief banner
+    msgs.style.paddingTop = '60px';
+
+    // Auto-debrief
+    const systemPrompt = buildDebriefSystemPrompt(payload);
+    const userMsg = `I just captured the flag with payload: "${payload}". Debrief me on what I did and why it worked.`;
+    chatHistory.push({ role: 'user', content: userMsg });
+    callClaude(systemPrompt, chatHistory);
+  }
+
+  function buildDebriefSystemPrompt(payload) {
+    const ch = sectionData?.challenge;
+    const aiContext = sectionData?.ai_context || '';
+    return `You are an AI tutor debriefing a student after they solved a cybersecurity challenge. Context: ${aiContext}
+
+The student submitted payload: "${payload}". Flag: "${ch?.flag || ''}".
+
+Explain in 3-4 sentences: what their payload did, why it worked at the SQL/code level, and the real-world impact. Then offer to go deeper on any aspect. Be direct, no filler.`;
   }
 
   function continueAfterDebrief() {
@@ -683,23 +929,30 @@ window.P002App = (() => {
     showScreen('homeScreen');
   }
 
-  // ==================== CHAT ====================
+  // ==================== CHAT (shared) ====================
   async function callClaude(systemPrompt, messages) {
     document.getElementById('sendBtn').disabled = true;
     showTyping();
+
     try {
       const sig = await P002Api.signPrompt(systemPrompt);
-      const reply = await P002Api.callClaude(systemPrompt, messages.slice(-4), sig);
+      const trimmed = messages.slice(-20);
+      const reply = await P002Api.callClaude(systemPrompt, trimmed, sig);
       removeTyping();
-      chatHistory.push({role:'assistant',content:reply});
+
+      chatHistory.push({ role: 'assistant', content: reply });
       addMessage('assistant', reply);
+
+      // Add quick reply chips for debrief
       if (chatMode === 'debrief' && chatHistory.length <= 3) {
-        addChatChips(['How do I prevent this?','Real-world impact?','Go deeper on the query']);
+        addChatChips(['How do I prevent this?', "What's the real-world impact?", 'Go deeper on the query']);
       }
+
     } catch(e) {
       removeTyping();
-      showToast('Error: '+P002Security.escapeHtml(e.message));
+      showToast('Error: ' + P002Security.escapeHtml(e.message));
     }
+
     document.getElementById('sendBtn').disabled = false;
     document.getElementById('userInput').focus();
   }
@@ -708,16 +961,22 @@ window.P002App = (() => {
     const input = document.getElementById('userInput');
     const text = input.value.trim();
     if (!text || document.getElementById('sendBtn').disabled) return;
+
     const sanitized = P002Security.sanitizeInput(text, 2000);
     addMessage('user', sanitized);
     input.value = '';
     input.style.height = 'auto';
-    chatHistory.push({role:'user',content:sanitized});
+
+    chatHistory.push({ role: 'user', content: sanitized });
+
+    // Remove chips
     document.querySelectorAll('.chat-chips').forEach(c => c.remove());
-    const sp = chatMode === 'debrief'
-      ? 'You are an AI tutor debriefing a cybersecurity challenge. Section: "'+(sectionData?.meta?.title||'')+'". Context: '+(sectionData?.ai_context||'')+'. Answer follow-up questions about what happened and why.'
+
+    const systemPrompt = chatMode === 'debrief'
+      ? buildDebriefSystemPrompt(sectionData?.challenge?.flag || '')
       : buildFreeChatSystemPrompt();
-    callClaude(sp, chatHistory);
+
+    callClaude(systemPrompt, chatHistory);
   }
 
   function addChatChips(options) {
@@ -730,11 +989,11 @@ window.P002App = (() => {
       chip.textContent = opt;
       chip.onclick = () => {
         wrap.remove();
-        const s = P002Security.sanitizeInput(opt, 200);
-        addMessage('user', s);
-        chatHistory.push({role:'user',content:s});
+        const sanitized = P002Security.sanitizeInput(opt, 200);
+        addMessage('user', sanitized);
+        chatHistory.push({ role: 'user', content: sanitized });
         const sp = chatMode === 'debrief'
-          ? 'You are an AI tutor debriefing. Context: '+(sectionData?.ai_context||'')
+          ? buildDebriefSystemPrompt(sectionData?.challenge?.flag || '')
           : buildFreeChatSystemPrompt();
         callClaude(sp, chatHistory);
       };
@@ -744,6 +1003,7 @@ window.P002App = (() => {
     msgs.scrollTop = msgs.scrollHeight;
   }
 
+  // ==================== MESSAGE RENDERING ====================
   function addMessage(role, content) {
     const msgs = document.getElementById('messages');
     const div = document.createElement('div');
@@ -769,30 +1029,40 @@ window.P002App = (() => {
     msgs.scrollTop = msgs.scrollHeight;
   }
 
-  function removeTyping() { const t = document.getElementById('typing-indicator'); if (t) t.remove(); }
+  function removeTyping() {
+    const t = document.getElementById('typing-indicator');
+    if (t) t.remove();
+  }
 
   function formatChatMessage(text) {
     const codeBlocks = [];
     text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
       const idx = codeBlocks.length;
-      codeBlocks.push('<pre><code>'+P002Security.escapeHtml(code.trim())+'</code></pre>');
-      return '%%CB'+idx+'%%';
+      codeBlocks.push('<pre><code>' + P002Security.escapeHtml(code.trim()) + '</code></pre>');
+      return '%%CB' + idx + '%%';
     });
     const inlineCode = [];
     text = text.replace(/`([^`\n]+)`/g, (_, code) => {
       const idx = inlineCode.length;
-      inlineCode.push('<code>'+P002Security.escapeHtml(code)+'</code>');
-      return '%%IC'+idx+'%%';
+      inlineCode.push('<code>' + P002Security.escapeHtml(code) + '</code>');
+      return '%%IC' + idx + '%%';
     });
     text = P002Security.escapeHtml(text);
-    text = text.replace(/\*\*([^*\n]+)\*\*/g,'<strong>$1</strong>').replace(/\*([^*]+)\*/g,'<em>$1</em>').replace(/\n/g,'<br><br>').replace(/\n/g,'<br>');
-    codeBlocks.forEach((b,i) => { text = text.replace('%%CB'+i+'%%', b); });
-    inlineCode.forEach((c,i) => { text = text.replace('%%IC'+i+'%%', c); });
+    text = text
+      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
+      .replace(/\n\n/g, '<br><br>')
+      .replace(/\n/g, '<br>');
+    codeBlocks.forEach((b, i) => { text = text.replace('%%CB' + i + '%%', b); });
+    inlineCode.forEach((c, i) => { text = text.replace('%%IC' + i + '%%', c); });
     return text;
   }
 
   // ==================== LEGACY FALLBACK ====================
+  // For old-schema sections — keeps basic chat working
   function startLegacySession() {
+    showToast('Legacy section format — basic chat mode', false);
+    // Minimal fallback: open a free chat screen
     chatMode = 'free';
     chatHistory = [];
     document.getElementById('chatHeaderLabel').textContent = 'Session';
@@ -803,9 +1073,10 @@ window.P002App = (() => {
     document.getElementById('messages').style.paddingTop = '';
     showScreen('chatScreen');
     document.getElementById('endBtn').style.display = 'block';
-    const sp = (sectionData?.system_prompt||'You are a cybersecurity instructor.') +
-      (sectionData?.reading_material ? '\n      READING MATERIAL:\n'+sectionData.reading_material : '');
-    callClaude(sp, [{role:'user',content:'Begin the lesson.'}]);
+
+    const sp = (sectionData?.system_prompt || 'You are a cybersecurity instructor.') +
+      (sectionData?.reading_material ? '\n\nREADING MATERIAL:\n' + sectionData.reading_material : '');
+    callClaude(sp, [{ role: 'user', content: 'Begin the lesson.' }]);
   }
 
   // ==================== UI HELPERS ====================
@@ -816,7 +1087,7 @@ window.P002App = (() => {
   }
 
   function setStatus(online, label) {
-    document.getElementById('statusDot').className = 'status-dot'+(online?' online':'');
+    document.getElementById('statusDot').className = 'status-dot' + (online ? ' online' : '');
     document.getElementById('statusText').textContent = label;
   }
 
@@ -825,32 +1096,68 @@ window.P002App = (() => {
     toast.className = 'toast';
     toast.style.background = success ? 'var(--success)' : 'var(--surface)';
     toast.style.color = success ? '#000' : 'var(--text)';
-    toast.style.border = '1px solid '+(success?'var(--success)':'var(--border2)');
+    toast.style.border = '1px solid ' + (success ? 'var(--success)' : 'var(--border2)');
     toast.textContent = msg;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
   }
 
-  function showAuthError(msg) { const el = document.getElementById('authError'); el.textContent = msg; el.style.display = 'block'; }
-  function hideAuthError() { document.getElementById('authError').style.display = 'none'; }
-  function handleChatKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
-  function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
+  function showAuthError(msg) {
+    const el = document.getElementById('authError');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function hideAuthError() {
+    document.getElementById('authError').style.display = 'none';
+  }
+
+  function handleChatKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
 
   // ==================== PUBLIC API ====================
   return {
-    init, handleAuth, logout, switchTab,
-    loadModuleCatalog, openModule, backToHome, backToModule,
-    openSectionPreview, backToSectionPreview,
-    startReading, endReading,
-    handlePopupAction, closeDrawer, sendDrawerMessage,
-    openFreeChat, closeFreeChat,
-    openChallenge, skipChallenge, trySimLogin, submitFlag,
-    showHint, nextHint, closeHintDrawer, openChallengeChat,
-    continueAfterDebrief, backToReader,
-    sendMessage, handleChatKey, autoResize,
-    showAdmin, showToast,
+    init,
+    handleAuth,
+    logout,
+    switchTab,
+    loadModuleCatalog,
+    openModule,
+    backToHome,
+    backToModule,
+    openSectionPreview,
+    backToSectionPreview,
+    startReading,
+    endReading,
+    handlePopupAction,
+    closeDrawer,
+    sendDrawerMessage,
+    openFreeChat,
+    closeFreeChat,
+    openChallenge,
+    skipChallenge,
+    trySimLogin,
+    submitFlag,
+    showHint,
+    nextHint,
+    closeHintDrawer,
+    openChallengeChat,
+    continueAfterDebrief,
+    backToReader,
+    sendMessage,
+    handleChatKey,
+    autoResize,
+    showAdmin,
+    showToast,
   };
 
 })();
 
+// Boot
 window.addEventListener('load', P002App.init);
