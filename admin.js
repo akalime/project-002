@@ -309,7 +309,7 @@ Include 10-16 content blocks. This may be one part of a larger chapter — focus
       body: JSON.stringify({
         system: systemPrompt,
         messages: [{ role: 'user', content: userMsg }],
-        model: 'sonnet',
+        model: document.getElementById('genModel').value,
         max_tokens: 4096,
       })
     });
