@@ -259,8 +259,9 @@ window.P002App = (() => {
   // ==================== START READING ====================
   async function startReading() {
     if (!sectionData) return;
-    const validation = P002Security.validateLessonJson(JSON.stringify(sectionData));
-    if (validation.schema === 'legacy') { startLegacySession(); return; }
+    // Detect schema directly from loaded data — avoid re-serializing which can corrupt validation
+    const isReader = sectionData.meta && sectionData.content && Array.isArray(sectionData.content);
+    if (!isReader) { startLegacySession(); return; }
     const meta = sectionData.meta;
     document.getElementById('readerChapter').textContent = 'Section '+meta.section+' of '+meta.total_sections+' · '+meta.module;
     document.getElementById('readerTitle').textContent = meta.title;
@@ -394,6 +395,12 @@ window.P002App = (() => {
 
   function hidePopup() { document.getElementById('askAiPopup').classList.remove('visible'); }
 
+  async function callHaiku(systemPrompt, messages) {
+    // Currently uses same model as callClaude — update claude-proxy to accept model param to enable Haiku
+    const sig = await P002Api.signPrompt(systemPrompt);
+    return await P002Api.callClaude(systemPrompt, messages.slice(-4), sig);
+  }
+
   async function handlePopupAction(action) {
     if (!selectedText) return;
     hidePopup();
@@ -414,7 +421,7 @@ window.P002App = (() => {
     try {
       const sp = buildDrawerSystemPrompt(action);
       const um = buildDrawerUserMessage(action, selectedText);
-      const reply = await P002Api.callClaude(sp, [{role:'user',content:um}]);
+      const reply = await callHaiku(sp, [{role:'user',content:um}]);
       document.getElementById('drawerTyping').style.display = 'none';
       document.getElementById('drawerResponse').innerHTML = formatBodyText(reply);
       drawerHistory = [{role:'user',content:um},{role:'assistant',content:reply}];
@@ -471,7 +478,7 @@ window.P002App = (() => {
     responseEl.innerHTML += '<div style="margin-top:10px;padding:8px 10px;background:rgba(255,77,77,0.08);border-radius:8px;font-size:12px;color:#ccc;">'+P002Security.escapeHtml(text)+'</div>';
     try {
       const sp = buildDrawerSystemPrompt(currentDrawerAction);
-      const reply = await P002Api.callClaude(sp, drawerHistory.slice(-10));
+      const reply = await callHaiku(sp, drawerHistory.slice(-4));
       document.getElementById('drawerTyping').style.display = 'none';
       drawerHistory.push({role:'assistant',content:reply});
       responseEl.innerHTML += '<div style="margin-top:8px;">'+formatBodyText(reply)+'</div>';
@@ -683,7 +690,7 @@ window.P002App = (() => {
     showTyping();
     try {
       const sig = await P002Api.signPrompt(systemPrompt);
-      const reply = await P002Api.callClaude(systemPrompt, messages.slice(-20), sig);
+      const reply = await P002Api.callClaude(systemPrompt, messages.slice(-4), sig);
       removeTyping();
       chatHistory.push({role:'assistant',content:reply});
       addMessage('assistant', reply);
