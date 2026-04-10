@@ -93,17 +93,11 @@ const P002Api = (() => {
   async function createSession(sectionNumber, module) {
     const user = await getUser();
     if (!user) throw new Error('Not authenticated');
-
     const { data, error } = await getClient()
       .from('sessions')
-      .insert({
-        user_id: user.id,
-        section_number: sectionNumber,
-        module: module
-      })
+      .insert({ user_id: user.id, section_number: sectionNumber, module })
       .select()
       .single();
-
     if (error) throw error;
     return data.id;
   }
@@ -118,7 +112,6 @@ const P002Api = (() => {
       .order('started_at', { ascending: false })
       .limit(1)
       .single();
-
     if (error) return null;
     return data;
   }
@@ -129,45 +122,33 @@ const P002Api = (() => {
       .select('role, content, created_at')
       .eq('session_id', sessionId)
       .order('created_at', { ascending: true });
-
     if (error) return [];
     return data;
   }
 
   async function saveMessage(sessionId, role, content) {
     if (!sessionId) return;
-    await getClient().from('session_messages').insert({
-      session_id: sessionId,
-      role,
-      content
-    });
+    await getClient().from('session_messages').insert({ session_id: sessionId, role, content });
   }
 
   async function completeSession(sessionId) {
     if (!sessionId) return;
-    await getClient().from('sessions').update({
-      completed_at: new Date().toISOString()
-    }).eq('id', sessionId);
+    await getClient().from('sessions').update({ completed_at: new Date().toISOString() }).eq('id', sessionId);
   }
 
   async function captureFlag(sessionId) {
     if (!sessionId) return;
-    await getClient().from('sessions').update({
-      flag_captured: true
-    }).eq('id', sessionId);
+    await getClient().from('sessions').update({ flag_captured: true }).eq('id', sessionId);
   }
 
   // ==================== CLAUDE PROXY ====================
-  async function callClaude(systemPrompt, messages, systemSig = null) {
+  async function callClaude(systemPrompt, messages, systemSig = null, model = null) {
     const session = await getSession();
     if (!session) throw new Error('Not authenticated');
 
-    const body = {
-      system: systemPrompt,
-      messages: messages
-    };
-
+    const body = { system: systemPrompt, messages };
     if (systemSig) body.system_sig = systemSig;
+    if (model) body.model = model;
 
     const response = await fetch(CLAUDE_PROXY, {
       method: 'POST',
@@ -188,7 +169,6 @@ const P002Api = (() => {
   async function adminRequest(action, payload = {}) {
     const session = await getSession();
     if (!session) throw new Error('Not authenticated');
-
     const response = await fetch(ADMIN_PROXY, {
       method: 'POST',
       headers: {
@@ -198,55 +178,22 @@ const P002Api = (() => {
       },
       body: JSON.stringify({ action, payload })
     });
-
     const data = await response.json();
     if (data.error) throw new Error(data.error);
     return data;
   }
 
-  async function adminGetSessions(limit = 100) {
-    return adminRequest('get_sessions', { limit });
-  }
-
-  async function adminGetSessionMessages(sessionId) {
-    return adminRequest('get_session_messages', { session_id: sessionId });
-  }
-
-  async function adminGetUsers() {
-    return adminRequest('get_users');
-  }
-
-  async function adminGetStats() {
-    return adminRequest('get_stats');
-  }
-
-  async function adminRunSql(query) {
-    return adminRequest('run_sql', { query });
-  }
-
-  async function adminSaveFile(path, content) {
-    return adminRequest('save_bucket_file', { path, content });
-  }
-
-  async function adminGetFile(path) {
-    return adminRequest('get_bucket_file', { path });
-  }
-
-  async function adminListFiles(folder) {
-    return adminRequest('list_bucket_files', { folder });
-  }
-
-  async function adminDeleteSession(sessionId) {
-    return adminRequest('delete_session', { session_id: sessionId });
-  }
-
-  async function adminBanUser(userId, ban = true) {
-    return adminRequest('disable_user', { user_id: userId, ban });
-  }
-
-  async function adminCreateUser(email, password) {
-    return adminRequest('create_user', { email, password });
-  }
+  async function adminGetSessions(limit = 100) { return adminRequest('get_sessions', { limit }); }
+  async function adminGetSessionMessages(sessionId) { return adminRequest('get_session_messages', { session_id: sessionId }); }
+  async function adminGetUsers() { return adminRequest('get_users'); }
+  async function adminGetStats() { return adminRequest('get_stats'); }
+  async function adminRunSql(query) { return adminRequest('run_sql', { query }); }
+  async function adminSaveFile(path, content) { return adminRequest('save_bucket_file', { path, content }); }
+  async function adminGetFile(path) { return adminRequest('get_bucket_file', { path }); }
+  async function adminListFiles(folder) { return adminRequest('list_bucket_files', { folder }); }
+  async function adminDeleteSession(sessionId) { return adminRequest('delete_session', { session_id: sessionId }); }
+  async function adminBanUser(userId, ban = true) { return adminRequest('disable_user', { user_id: userId, ban }); }
+  async function adminCreateUser(email, password) { return adminRequest('create_user', { email, password }); }
 
   // ==================== PROMPT SIGNING ====================
   const PROMPT_SECRET = 'REPLACE_WITH_YOUR_PROMPT_SECRET';
@@ -264,54 +211,13 @@ const P002Api = (() => {
 
   // ==================== PUBLIC API ====================
   return {
-    // Config
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY,
-    ADMIN_USER_ID,
-    BUCKET,
-
-    // Client
-    getClient,
-
-    // Auth
-    getSession,
-    getUser,
-    signIn,
-    signUp,
-    signOut,
-    isAdmin,
-
-    // Storage
-    listBucket,
-    downloadFile,
-    uploadFile,
-    deleteFile,
-
-    // Sessions
-    createSession,
-    getLastSession,
-    getSessionMessages,
-    saveMessage,
-    completeSession,
-    captureFlag,
-
-    // Claude
-    callClaude,
-    signPrompt,
-
-    // Admin
-    adminRequest,
-    adminGetSessions,
-    adminGetSessionMessages,
-    adminGetUsers,
-    adminGetStats,
-    adminRunSql,
-    adminSaveFile,
-    adminGetFile,
-    adminListFiles,
-    adminDeleteSession,
-    adminBanUser,
-    adminCreateUser,
+    SUPABASE_URL, SUPABASE_ANON_KEY, ADMIN_USER_ID, BUCKET,
+    getClient, getSession, getUser, signIn, signUp, signOut, isAdmin,
+    listBucket, downloadFile, uploadFile, deleteFile,
+    createSession, getLastSession, getSessionMessages, saveMessage, completeSession, captureFlag,
+    callClaude, signPrompt,
+    adminRequest, adminGetSessions, adminGetSessionMessages, adminGetUsers, adminGetStats,
+    adminRunSql, adminSaveFile, adminGetFile, adminListFiles, adminDeleteSession, adminBanUser, adminCreateUser,
   };
 
 })();
