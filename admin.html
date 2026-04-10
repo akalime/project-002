@@ -1105,10 +1105,10 @@ body {
     </div>
     <div class="form-field" style="display:flex;flex-direction:column;gap:8px;">
       <label style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;">Password</label>
-      <input class="modal-input" type="password" id="authPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <input class="modal-input" type="password" id="authPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')P002Admin.doLogin()"/>
     </div>
     <div class="auth-error" id="authError"></div>
-    <button class="auth-btn" id="authBtn" onclick="doLogin()">Access Admin</button>
+    <button class="auth-btn" id="authBtn" onclick="P002Admin.doLogin()">Access Admin</button>
   </div>
 </div>
 
@@ -1117,23 +1117,23 @@ body {
 
   <!-- Top Bar -->
   <div class="topbar">
-    <button class="fb-toggle" onclick="toggleSidebar()" style="background:transparent;border:1px solid var(--border2);color:var(--text-dim);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:16px;margin-right:4px;">☰</button>
+    <button class="fb-toggle" onclick="P002Admin.toggleSidebar()" style="background:transparent;border:1px solid var(--border2);color:var(--text-dim);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:16px;margin-right:4px;">☰</button>
     <div class="topbar-logo">P002</div>
     <div class="topbar-badge">ADMIN</div>
     <div class="topbar-nav">
-      <button class="topbar-btn active" onclick="switchPanel('lessons')" id="navLessons">📁 Lessons</button>
-      <button class="topbar-btn" onclick="switchPanel('rules')" id="navRules">🧠 AI Rules</button>
-      <button class="topbar-btn" onclick="switchPanel('test')" id="navTest">🧪 Test Mode</button>
-      <button class="topbar-btn" onclick="switchPanel('sessions')" id="navSessions">💬 Sessions</button>
-      <button class="topbar-btn" onclick="switchPanel('users')" id="navUsers">👤 Users</button>
-      <button class="topbar-btn" onclick="switchPanel('stats')" id="navStats">📊 Stats</button>
+      <button class="topbar-btn active" onclick="P002Admin.switchPanel('lessons')" id="navLessons">📁 Lessons</button>
+      <button class="topbar-btn" onclick="P002Admin.switchPanel('rules')" id="navRules">🧠 AI Rules</button>
+      <button class="topbar-btn" onclick="P002Admin.switchPanel('test')" id="navTest">🧪 Test Mode</button>
+      <button class="topbar-btn" onclick="P002Admin.switchPanel('sessions')" id="navSessions">💬 Sessions</button>
+      <button class="topbar-btn" onclick="P002Admin.switchPanel('users')" id="navUsers">👤 Users</button>
+      <button class="topbar-btn" onclick="P002Admin.switchPanel('stats')" id="navStats">📊 Stats</button>
     </div>
     <div class="topbar-right">
       <div class="topbar-status">
         <div class="status-dot ok" id="connDot"></div>
         <span id="connLabel">connected</span>
       </div>
-      <button class="topbar-action-btn" onclick="doLogout()">↩ Logout</button>
+      <button class="topbar-action-btn" onclick="P002Admin.doLogout()">↩ Logout</button>
     </div>
   </div>
 
@@ -1146,9 +1146,10 @@ body {
         <div class="fb-header">
           <div class="fb-title">Storage</div>
           <div class="fb-actions">
-            <button class="fb-btn" onclick="refreshFiles()" title="Refresh">↻</button>
-            <button class="fb-btn" onclick="showNewFileModal()" title="New file">+</button>
-            <button class="fb-btn fb-toggle" onclick="toggleSidebar()" title="Close">✕</button>
+            <button class="fb-btn" onclick="P002Admin.refreshFiles()" title="Refresh">↻</button>
+            <button class="fb-btn" onclick="P002Admin.showNewFileModal()" title="New file">+</button>
+            <button class="fb-btn" onclick="P002Admin.showZipModal()" title="Upload ZIP">📦</button>
+            <button class="fb-btn fb-toggle" onclick="P002Admin.toggleSidebar()" title="Close">✕</button>
           </div>
         </div>
         <div class="fb-tree" id="fileTree">
@@ -1159,17 +1160,17 @@ body {
         <div class="editor-topbar" id="editorTopbar">
           <div class="editor-filename" id="editorFilename">No file selected</div>
           <div id="editorValidateStatus" class="editor-validate-status" style="display:none"></div>
-          <button class="editor-btn" onclick="validateEditor()" id="btnValidate" style="display:none">✓ Validate</button>
-          <button class="editor-btn" onclick="formatEditor()" id="btnFormat" style="display:none">⟳ Format</button>
-          <button class="editor-btn primary" onclick="saveEditor()" id="btnSave" style="display:none">💾 Save</button>
+          <button class="editor-btn" onclick="P002Admin.validateEditor()" id="btnValidate" style="display:none">✓ Validate</button>
+          <button class="editor-btn" onclick="P002Admin.formatEditor()" id="btnFormat" style="display:none">⟳ Format</button>
+          <button class="editor-btn primary" onclick="P002Admin.saveEditor()" id="btnSave" style="display:none">💾 Save</button>
         </div>
         <div id="editorEmpty" class="editor-empty">
           <div class="editor-empty-icon">📄</div>
           <div class="editor-empty-text">Select a file to edit</div>
         </div>
         <textarea class="editor-textarea" id="editorTextarea" style="display:none" 
-          oninput="onEditorChange()" 
-          onkeydown="handleEditorKey(event)"
+          oninput="P002Admin.onEditorChange()" 
+          onkeydown="P002Admin.handleEditorKey(event)"
           spellcheck="false"></textarea>
         <div class="editor-statusbar" id="editorStatusbar" style="display:none">
           <span class="editor-status-item" id="editorLines">0 lines</span>
@@ -1184,22 +1185,22 @@ body {
       <div class="rules-sidebar">
         <div class="rules-sidebar-section">
           <div class="rules-sidebar-label">Global</div>
-          <div class="rules-item active" onclick="loadRule('system_prompt', this)">System Prompt</div>
-          <div class="rules-item" onclick="loadRule('teaching_balance', this)">Teaching Balance</div>
-          <div class="rules-item" onclick="loadRule('confidentiality', this)">Confidentiality</div>
-          <div class="rules-item" onclick="loadRule('sequencing', this)">Sequencing Rules</div>
+          <div class="rules-item active" onclick="P002Admin.loadRule('system_prompt', this)">System Prompt</div>
+          <div class="rules-item" onclick="P002Admin.loadRule('teaching_balance', this)">Teaching Balance</div>
+          <div class="rules-item" onclick="P002Admin.loadRule('confidentiality', this)">Confidentiality</div>
+          <div class="rules-item" onclick="P002Admin.loadRule('sequencing', this)">Sequencing Rules</div>
         </div>
         <div class="rules-sidebar-section">
           <div class="rules-sidebar-label">Per Lesson</div>
-          <div class="rules-item" onclick="loadRule('lesson_rules', this)">Lesson Rules</div>
-          <div class="rules-item" onclick="loadRule('memory_anchors', this)">Memory Anchors</div>
-          <div class="rules-item" onclick="loadRule('datasets', this)">Datasets</div>
+          <div class="rules-item" onclick="P002Admin.loadRule('lesson_rules', this)">Lesson Rules</div>
+          <div class="rules-item" onclick="P002Admin.loadRule('memory_anchors', this)">Memory Anchors</div>
+          <div class="rules-item" onclick="P002Admin.loadRule('datasets', this)">Datasets</div>
         </div>
       </div>
       <div class="rules-content">
         <div class="editor-topbar">
           <div class="editor-filename" id="rulesFilename">System Prompt</div>
-          <button class="editor-btn" onclick="saveRule()" id="btnSaveRule">💾 Save Rule</button>
+          <button class="editor-btn" onclick="P002Admin.saveRule()" id="btnSaveRule">💾 Save Rule</button>
         </div>
         <textarea class="editor-textarea" id="rulesTextarea" spellcheck="false" 
           placeholder="Select a rule to edit..." style="flex:1"></textarea>
@@ -1213,35 +1214,35 @@ body {
     <div class="panel" id="panelTest">
       <div class="test-sidebar">
         <div class="test-sidebar-title">Test Suites</div>
-        <div class="test-item active" onclick="selectTest('lesson', this)">
+        <div class="test-item active" onclick="P002Admin.selectTest('lesson', this)">
           <div class="test-item-icon">🎓</div>
           <div class="test-item-info">
             <div class="test-item-name">Lesson Flow</div>
             <div class="test-item-desc">Test teaching path</div>
           </div>
         </div>
-        <div class="test-item" onclick="selectTest('flag', this)">
+        <div class="test-item" onclick="P002Admin.selectTest('flag', this)">
           <div class="test-item-icon">🏴</div>
           <div class="test-item-info">
             <div class="test-item-name">Flag Validator</div>
             <div class="test-item-desc">Test flag submission</div>
           </div>
         </div>
-        <div class="test-item" onclick="selectTest('sim', this)">
+        <div class="test-item" onclick="P002Admin.selectTest('sim', this)">
           <div class="test-item-icon">🌐</div>
           <div class="test-item-info">
             <div class="test-item-name">Sim UI</div>
             <div class="test-item-desc">Test practice environment</div>
           </div>
         </div>
-        <div class="test-item" onclick="selectTest('cli', this)">
+        <div class="test-item" onclick="P002Admin.selectTest('cli', this)">
           <div class="test-item-icon">⌨</div>
           <div class="test-item-info">
             <div class="test-item-name">CLI Commands</div>
             <div class="test-item-desc">Test terminal responses</div>
           </div>
         </div>
-        <div class="test-item" onclick="selectTest('json', this)">
+        <div class="test-item" onclick="P002Admin.selectTest('json', this)">
           <div class="test-item-icon">📋</div>
           <div class="test-item-info">
             <div class="test-item-name">JSON Validator</div>
@@ -1252,7 +1253,7 @@ body {
       <div class="test-content">
         <div class="test-header">
           <div class="test-title" id="testTitle">Lesson Flow Test</div>
-          <button class="test-run-btn" onclick="runTest()">▶ Run Test</button>
+          <button class="test-run-btn" onclick="P002Admin.runTest()">▶ Run Test</button>
         </div>
         <div class="test-body" id="testBody">
           <div class="test-section">
@@ -1284,7 +1285,7 @@ body {
         <div class="sessions-list">
           <div class="sessions-list-header">
             <div class="sessions-list-title">Sessions</div>
-            <button class="fb-btn" onclick="loadSessions()">↻</button>
+            <button class="fb-btn" onclick="P002Admin.loadSessions()">↻</button>
           </div>
           <div class="sessions-list-body" id="sessionsList">
             <div class="loading">Loading...</div>
@@ -1293,7 +1294,7 @@ body {
         <div class="session-detail" id="sessionDetail">
           <div class="session-detail-header">
             <div class="session-detail-title" id="sessionDetailTitle">Select a session to view</div>
-            <button class="editor-btn danger" id="btnDeleteSession" style="display:none" onclick="deleteCurrentSession()">🗑 Delete</button>
+            <button class="editor-btn danger" id="btnDeleteSession" style="display:none" onclick="P002Admin.deleteCurrentSession()">🗑 Delete</button>
           </div>
           <div class="session-messages" id="sessionMessages">
             <div class="loading">Select a session</div>
@@ -1307,7 +1308,7 @@ body {
       <div class="users-panel">
         <div class="panel-header">
           <div class="panel-title">Users</div>
-          <button class="panel-action-btn" onclick="showInviteModal()">+ Invite User</button>
+          <button class="panel-action-btn" onclick="P002Admin.showInviteModal()">+ Invite User</button>
         </div>
         <div class="data-table" id="usersTable">
           <div class="loading">Loading...</div>
@@ -1320,7 +1321,7 @@ body {
       <div class="stats-panel">
         <div class="panel-header">
           <div class="panel-title">Platform Stats</div>
-          <button class="panel-action-btn" onclick="loadStats()">↻ Refresh</button>
+          <button class="panel-action-btn" onclick="P002Admin.loadStats()">↻ Refresh</button>
         </div>
         <div class="stats-grid" id="statsGrid">
           <div class="loading">Loading...</div>
@@ -1328,7 +1329,7 @@ body {
         <div>
           <div class="test-section-title" style="margin-bottom:12px;">SQL Query</div>
           <textarea class="test-input" id="sqlInput" placeholder="SELECT * FROM sessions LIMIT 10;" style="min-height:60px;margin-bottom:10px;"></textarea>
-          <button class="test-run-btn" onclick="runSql()" style="margin-bottom:12px;">▶ Run Query</button>
+          <button class="test-run-btn" onclick="P002Admin.runSql()" style="margin-bottom:12px;">▶ Run Query</button>
           <div class="test-output" id="sqlOutput" style="display:none"></div>
         </div>
       </div>
@@ -1350,8 +1351,8 @@ body {
       <input class="modal-input" id="newFileFolder" value="module_intro_web_apps"/>
     </div>
     <div class="modal-actions">
-      <button class="modal-btn" onclick="closeModal('newFileModal')">Cancel</button>
-      <button class="modal-btn primary" onclick="createNewFile()">Create</button>
+      <button class="modal-btn" onclick="P002Admin.closeModal('newFileModal')">Cancel</button>
+      <button class="modal-btn primary" onclick="P002Admin.createNewFile()">Create</button>
     </div>
   </div>
 </div>
@@ -1369,844 +1370,37 @@ body {
       <input class="modal-input" id="invitePassword" placeholder="temp-password-123"/>
     </div>
     <div class="modal-actions">
-      <button class="modal-btn" onclick="closeModal('inviteModal')">Cancel</button>
-      <button class="modal-btn primary" onclick="createUser()">Create Account</button>
+      <button class="modal-btn" onclick="P002Admin.closeModal('inviteModal')">Cancel</button>
+      <button class="modal-btn primary" onclick="P002Admin.createUser()">Create Account</button>
     </div>
   </div>
 </div>
 
 <!-- Mobile overlay -->
-<div class="mobile-overlay" id="mobileOverlay" onclick="closeSidebar()"></div>
-
-<script>
-// ==================== CONFIG ====================
-const SUPABASE_URL = 'https://obobtgryhcrptcyaukvw.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ib2J0Z3J5aGNycHRjeWF1a3Z3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3MTUxMzQsImV4cCI6MjA5MTI5MTEzNH0.o3Rq3VqTN6uWzX4Uqfqd8VpH2wlS5PmoDvtRQOMc9EU';
-const ADMIN_USER_ID = '33a3fc69-5fad-4344-ba69-c1a4381be3d5';
-const ADMIN_PROXY = `${SUPABASE_URL}/functions/v1/admin-proxy`;
-const BUCKET = 'project002-docs';
-
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// ==================== STATE ====================
-let currentUser = null;
-let currentFile = null;
-let editorDirty = false;
-let currentSession = null;
-let currentTest = 'lesson';
-let currentRule = 'system_prompt';
-let systemPromptCache = null;
-
-// ==================== INIT ====================
-async function init() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (session && session.user.id === ADMIN_USER_ID) {
-    currentUser = session.user;
-    showApp();
-  }
-}
-
-function showApp() {
-  document.getElementById('authScreen').style.display = 'none';
-  const app = document.getElementById('appShell');
-  app.style.display = 'flex';
-  app.style.flex = '1';
-  app.style.minHeight = '0';
-  switchPanel('lessons');
-}
-
-// ==================== AUTH ====================
-async function doLogin() {
-  const email = document.getElementById('authEmail').value.trim();
-  const password = document.getElementById('authPassword').value;
-  const btn = document.getElementById('authBtn');
-  const err = document.getElementById('authError');
-
-  err.style.display = 'none';
-  btn.disabled = true;
-  btn.textContent = 'Authenticating...';
-
-  try {
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    if (data.user.id !== ADMIN_USER_ID) throw new Error('Not authorized as admin');
-    currentUser = data.user;
-    showApp();
-  } catch(e) {
-    err.textContent = e.message;
-    err.style.display = 'block';
-  }
-
-  btn.disabled = false;
-  btn.textContent = 'Access Admin';
-}
-
-async function doLogout() {
-  await sb.auth.signOut();
-  location.reload();
-}
-
-// ==================== ADMIN REQUEST ====================
-async function adminReq(action, payload = {}) {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) throw new Error('Not authenticated');
-
-  const res = await fetch(ADMIN_PROXY, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
-      'apikey': SUPABASE_ANON_KEY
-    },
-    body: JSON.stringify({ action, payload })
-  });
-
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
-  return data;
-}
-
-// ==================== PANEL SWITCHING ====================
-function switchPanel(name) {
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.topbar-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('panel' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
-  document.getElementById('nav' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
-
-  // Load data for panel
-  switch(name) {
-    case 'lessons': loadFiles(); break;
-    case 'sessions': loadSessions(); break;
-    case 'users': loadUsers(); break;
-    case 'stats': loadStats(); break;
-    case 'rules': loadRule(currentRule, null); break;
-  }
-}
-
-// ==================== FILE BROWSER ====================
-let fileTree = {};
-
-async function loadFiles() {
-  const tree = document.getElementById('fileTree');
-  tree.innerHTML = '<div class="loading">Loading...</div>';
-
-  try {
-    const { data, error } = await sb.storage.from(BUCKET).list('', { limit: 50 });
-    if (error) throw error;
-
-    tree.innerHTML = '';
-    const folders = data.filter(f => !f.metadata); // folders have no metadata
-
-    for (const folder of folders) {
-      const folderEl = await buildFolderEl(folder.name);
-      tree.appendChild(folderEl);
-    }
-
-    // Also show root files
-    const rootFiles = data.filter(f => f.metadata);
-    rootFiles.forEach(f => {
-      const fileEl = buildFileEl(f, '');
-      tree.appendChild(fileEl);
-    });
-
-  } catch(e) {
-    tree.innerHTML = `<div style="padding:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--danger);">Error: ${e.message}</div>`;
-  }
-}
-
-async function buildFolderEl(folderName) {
-  const folder = document.createElement('div');
-  folder.className = 'fb-folder';
-
-  const nameEl = document.createElement('div');
-  nameEl.className = 'fb-folder-name open';
-  nameEl.innerHTML = `<span class="fb-arrow">▶</span> 📁 ${folderName}`;
-
-  const filesEl = document.createElement('div');
-  filesEl.className = 'fb-files';
-
-  nameEl.onclick = () => {
-    nameEl.classList.toggle('open');
-    filesEl.style.display = nameEl.classList.contains('open') ? 'block' : 'none';
-  };
-
-  folder.appendChild(nameEl);
-  folder.appendChild(filesEl);
-
-  // Load files in folder
-  try {
-    const { data } = await sb.storage.from(BUCKET).list(folderName, { limit: 100, sortBy: { column: 'name' } });
-    if (data) {
-      data.forEach(f => {
-        const fileEl = buildFileEl(f, folderName);
-        filesEl.appendChild(fileEl);
-      });
-    }
-  } catch(e) {}
-
-  return folder;
-}
-
-function buildFileEl(file, folder) {
-  const path = folder ? `${folder}/${file.name}` : file.name;
-  const el = document.createElement('div');
-  el.className = 'fb-file';
-  el.dataset.path = path;
-
-  const isJson = file.name.endsWith('.json');
-  const icon = isJson ? '{ }' : '📄';
-
-  el.innerHTML = `
-    <span class="fb-file-icon">${icon}</span>
-    <span style="flex:1">${file.name}</span>
-    <div class="fb-file-actions">
-      <span class="fb-file-action" onclick="event.stopPropagation();deleteFile('${path}')">✕</span>
-    </div>`;
-
-  el.onclick = () => openFile(path, el);
-  return el;
-}
-
-async function openFile(path, el) {
-  if (editorDirty) {
-    if (!confirm('Discard unsaved changes?')) return;
-  }
-
-  // Update active state
-  document.querySelectorAll('.fb-file').forEach(f => f.classList.remove('active'));
-  if (el) el.classList.add('active');
-
-  currentFile = path;
-  editorDirty = false;
-
-  const textarea = document.getElementById('editorTextarea');
-  const empty = document.getElementById('editorEmpty');
-  const statusbar = document.getElementById('editorStatusbar');
-
-  textarea.value = 'Loading...';
-  textarea.style.display = 'block';
-  empty.style.display = 'none';
-  statusbar.style.display = 'flex';
-
-  document.getElementById('editorFilename').textContent = path;
-  document.getElementById('editorFilename').className = 'editor-filename';
-  document.getElementById('btnValidate').style.display = '';
-  document.getElementById('btnFormat').style.display = '';
-  document.getElementById('btnSave').style.display = '';
-  document.getElementById('editorValidateStatus').style.display = 'none';
-  document.getElementById('editorPath').textContent = path;
-
-  try {
-    const data = await adminReq('get_bucket_file', { path });
-    const content = data.content;
-
-    // Pretty print JSON
-    try {
-      textarea.value = JSON.stringify(JSON.parse(content), null, 2);
-    } catch {
-      textarea.value = content;
-    }
-
-    updateEditorStatus();
-  } catch(e) {
-    textarea.value = `Error loading file: ${e.message}`;
-  }
-}
-
-function onEditorChange() {
-  editorDirty = true;
-  const filename = document.getElementById('editorFilename');
-  filename.className = 'editor-filename dirty';
-  updateEditorStatus();
-  // Hide validate status on change
-  document.getElementById('editorValidateStatus').style.display = 'none';
-}
-
-function updateEditorStatus() {
-  const text = document.getElementById('editorTextarea').value;
-  const lines = text.split('\n').length;
-  const size = (new Blob([text]).size / 1024).toFixed(1);
-  document.getElementById('editorLines').textContent = `${lines} lines`;
-  document.getElementById('editorSize').textContent = `${size} KB`;
-}
-
-function validateEditor() {
-  const text = document.getElementById('editorTextarea').value;
-  const status = document.getElementById('editorValidateStatus');
-  status.style.display = '';
-  try {
-    JSON.parse(text);
-    status.textContent = '✓ Valid JSON';
-    status.className = 'editor-validate-status ok';
-  } catch(e) {
-    status.textContent = '✗ ' + e.message;
-    status.className = 'editor-validate-status err';
-  }
-}
-
-function formatEditor() {
-  const textarea = document.getElementById('editorTextarea');
-  try {
-    textarea.value = JSON.stringify(JSON.parse(textarea.value), null, 2);
-    editorDirty = true;
-    updateEditorStatus();
-    toast('Formatted', 'ok');
-  } catch(e) {
-    toast('Invalid JSON — cannot format', 'err');
-  }
-}
-
-function handleEditorKey(e) {
-  // Tab key inserts spaces
-  if (e.key === 'Tab') {
-    e.preventDefault();
-    const start = e.target.selectionStart;
-    const end = e.target.selectionEnd;
-    e.target.value = e.target.value.substring(0, start) + '  ' + e.target.value.substring(end);
-    e.target.selectionStart = e.target.selectionEnd = start + 2;
-  }
-  // Ctrl+S saves
-  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-    e.preventDefault();
-    saveEditor();
-  }
-}
-
-async function saveEditor() {
-  if (!currentFile) return;
-  const text = document.getElementById('editorTextarea').value;
-
-  // Validate first
-  try { JSON.parse(text); } catch(e) {
-    toast('Cannot save — invalid JSON: ' + e.message, 'err');
-    return;
-  }
-
-  const btn = document.getElementById('btnSave');
-  btn.textContent = 'Saving...';
-  btn.disabled = true;
-
-  try {
-    await adminReq('save_bucket_file', { path: currentFile, content: text });
-    editorDirty = false;
-    document.getElementById('editorFilename').className = 'editor-filename';
-    document.getElementById('editorFilename').textContent = currentFile;
-    toast('Saved: ' + currentFile, 'ok');
-  } catch(e) {
-    toast('Save failed: ' + e.message, 'err');
-  }
-
-  btn.textContent = '💾 Save';
-  btn.disabled = false;
-}
-
-async function deleteFile(path) {
-  if (!confirm(`Delete ${path}? This cannot be undone.`)) return;
-  try {
-    const { error } = await sb.storage.from(BUCKET).remove([path]);
-    if (error) throw error;
-    toast('Deleted: ' + path, 'ok');
-    if (currentFile === path) {
-      currentFile = null;
-      document.getElementById('editorTextarea').style.display = 'none';
-      document.getElementById('editorEmpty').style.display = 'flex';
-      document.getElementById('editorStatusbar').style.display = 'none';
-      document.getElementById('editorFilename').textContent = 'No file selected';
-      document.getElementById('btnValidate').style.display = 'none';
-      document.getElementById('btnFormat').style.display = 'none';
-      document.getElementById('btnSave').style.display = 'none';
-    }
-    loadFiles();
-  } catch(e) {
-    toast('Delete failed: ' + e.message, 'err');
-  }
-}
-
-function refreshFiles() { loadFiles(); }
-
-function showNewFileModal() {
-  document.getElementById('newFileModal').style.display = 'flex';
-}
-
-async function createNewFile() {
-  const name = document.getElementById('newFileName').value.trim();
-  const folder = document.getElementById('newFileFolder').value.trim();
-  if (!name) return;
-
-  const path = folder ? `${folder}/${name}` : name;
-  const template = {
-    system_prompt: "You are a cybersecurity instructor.",
-    lesson: { title: "New Section", module: "Introduction to Web Applications", section: 0, total_sections: 17, difficulty: "beginner", prerequisites: [], has_practice_box: false },
-    teaching_path: [{ id: "1", type: "knowledge_probe", phase: "entry", prompt: "What do you already know about this topic?" }],
-    teaching_rules: { never_do: [], always_do: [], pacing: "" },
-    datasets: {},
-    session_summary: { description: "Populated at lesson end.", concepts_mastered: [], struggled_with: [], flag_captured: false },
-    metadata: { source: "Manual", version: "1.0" }
-  };
-
-  try {
-    await adminReq('save_bucket_file', { path, content: JSON.stringify(template, null, 2) });
-    toast('Created: ' + path, 'ok');
-    closeModal('newFileModal');
-    loadFiles();
-    // Open the new file
-    setTimeout(() => openFile(path, null), 500);
-  } catch(e) {
-    toast('Create failed: ' + e.message, 'err');
-  }
-}
-
-// ==================== AI RULES ====================
-const RULE_DESCRIPTIONS = {
-  system_prompt: 'Global system prompt — injected at the start of every lesson session',
-  teaching_balance: 'Teaching balance rules — explain vs question ratio',
-  confidentiality: 'Confidentiality rules — what AI should never reveal',
-  sequencing: 'Node sequencing rules — how teaching path advances',
-  lesson_rules: 'Per-lesson teaching_rules field from the section JSON',
-  memory_anchors: 'Memory anchor examples for the current lesson',
-  datasets: 'Dataset tables injected for relevant phases'
-};
-
-async function loadRule(ruleKey, el) {
-  if (el) {
-    document.querySelectorAll('.rules-item').forEach(i => i.classList.remove('active'));
-    el.classList.add('active');
-  }
-  currentRule = ruleKey;
-
-  const textarea = document.getElementById('rulesTextarea');
-  const filename = document.getElementById('rulesFilename');
-  filename.textContent = ruleKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-
-  // For global rules, extract from a base section JSON
-  if (['system_prompt', 'teaching_balance', 'confidentiality', 'sequencing'].includes(ruleKey)) {
-    textarea.value = 'Loading...';
-    try {
-      // Load section_09 as reference
-      const data = await adminReq('get_bucket_file', { path: 'module_intro_web_apps/section_09.json' });
-      const json = JSON.parse(data.content);
-
-      if (ruleKey === 'system_prompt') {
-        textarea.value = json.system_prompt || '';
-      } else if (ruleKey === 'teaching_balance') {
-        // Extract teaching balance section from system prompt
-        const sp = json.system_prompt || '';
-        const start = sp.indexOf('TEACHING BALANCE');
-        textarea.value = start !== -1 ? sp.substring(start) : 'Teaching balance rules not found in system prompt.';
-      } else if (ruleKey === 'confidentiality') {
-        const sp = json.system_prompt || '';
-        const start = sp.indexOf('CONFIDENTIALITY');
-        const end = sp.indexOf('\n\nTEACHING VARIETY', start);
-        textarea.value = start !== -1 ? sp.substring(start, end !== -1 ? end : undefined) : 'Confidentiality rules not found.';
-      } else if (ruleKey === 'sequencing') {
-        const sp = json.system_prompt || '';
-        const start = sp.indexOf('CRITICAL SEQUENCING');
-        const end = sp.indexOf('\n\nTEACHING BALANCE', start);
-        textarea.value = start !== -1 ? sp.substring(start, end !== -1 ? end : undefined) : 'Sequencing rules not found.';
-      }
-    } catch(e) {
-      textarea.value = 'Error loading: ' + e.message;
-    }
-  } else {
-    textarea.value = `// Edit ${ruleKey} in the Lessons tab by opening the section JSON file.\n// Select a file from the file browser to edit per-lesson rules.`;
-  }
-}
-
-async function saveRule() {
-  if (!['system_prompt'].includes(currentRule)) {
-    toast('Edit per-lesson rules directly in the JSON editor', 'warn');
-    return;
-  }
-  toast('Rule saving coming soon — edit system_prompt directly in the JSON files', 'warn');
-}
-
-// ==================== TEST MODE ====================
-function selectTest(testKey, el) {
-  document.querySelectorAll('.test-item').forEach(i => i.classList.remove('active'));
-  el.classList.add('active');
-  currentTest = testKey;
-
-  const titles = {
-    lesson: 'Lesson Flow Test',
-    flag: 'Flag Validator Test',
-    sim: 'Sim UI Test',
-    cli: 'CLI Command Test',
-    json: 'JSON Validator — All Sections'
-  };
-
-  document.getElementById('testTitle').textContent = titles[testKey];
-  document.getElementById('testOutput').textContent = 'Run a test to see output...';
-  document.getElementById('testOutput').className = 'test-output';
-}
-
-async function runTest() {
-  const output = document.getElementById('testOutput');
-  const section = document.getElementById('testSection')?.value;
-  const input = document.getElementById('testInput')?.value;
-
-  output.textContent = 'Running...';
-  output.className = 'test-output';
-
-  try {
-    switch(currentTest) {
-      case 'flag': await runFlagTest(input, section, output); break;
-      case 'json': await runJsonValidation(output); break;
-      case 'lesson': await runLessonTest(section, input, output); break;
-      case 'sim': runSimTest(output); break;
-      case 'cli': await runCliTest(input, output); break;
-    }
-  } catch(e) {
-    output.innerHTML = `<span class="test-result-fail">ERROR: ${e.message}</span>`;
-  }
-}
-
-async function runFlagTest(input, section, output) {
-  if (!section) { output.textContent = 'Select a section first'; return; }
-
-  const data = await adminReq('get_bucket_file', { path: `module_intro_web_apps/${section}` });
-  const json = JSON.parse(data.content);
-  const flag = json.lesson?.practice_flag || json.simulation?.flag;
-
-  if (!flag) {
-    output.innerHTML = `<span class="test-result-info">ℹ No flag defined for this section</span>`;
-    return;
-  }
-
-  const submitted = input?.trim() || '';
-  const match = submitted.toLowerCase() === flag.toLowerCase();
-
-  output.innerHTML = `<span class="test-result-info">Expected flag: ${flag}</span>\n` +
-    `<span class="test-result-info">Submitted: ${submitted || '(empty)'}</span>\n` +
-    (match
-      ? `<span class="test-result-pass">✓ PASS — Flag matches</span>`
-      : `<span class="test-result-fail">✗ FAIL — Flag does not match</span>`);
-}
-
-async function runJsonValidation(output) {
-  output.textContent = 'Validating all sections...\n';
-  const sections = ['section_01','section_02','section_03','section_04','section_05',
-    'section_06','section_07','section_08','section_09','section_10',
-    'section_11','section_12','section_13','section_14','section_15',
-    'section_16','section_17'];
-
-  let results = '';
-  let passed = 0; let failed = 0;
-
-  for (const s of sections) {
-    try {
-      const data = await adminReq('get_bucket_file', { path: `module_intro_web_apps/${s}.json` });
-      JSON.parse(data.content);
-      results += `<span class="test-result-pass">✓ ${s}.json — valid</span>\n`;
-      passed++;
-    } catch(e) {
-      results += `<span class="test-result-fail">✗ ${s}.json — ${e.message}</span>\n`;
-      failed++;
-    }
-  }
-
-  results += `\n<span class="test-result-info">Result: ${passed} passed, ${failed} failed</span>`;
-  output.innerHTML = results;
-}
-
-async function runLessonTest(section, input, output) {
-  if (!section) { output.textContent = 'Select a section first'; return; }
-  if (!input) { output.textContent = 'Enter a test message'; return; }
-
-  output.textContent = 'Calling Claude...';
-
-  const data = await adminReq('get_bucket_file', { path: `module_intro_web_apps/${section}` });
-  const json = JSON.parse(data.content);
-  const node = json.teaching_path?.[0];
-  const systemPrompt = `${json.system_prompt}\n\nCURRENT NODE:\n${JSON.stringify(node, null, 2)}\n\nTEACHING RULES:\n${JSON.stringify(json.teaching_rules, null, 2)}`;
-
-  const { data: { session } } = await sb.auth.getSession();
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/claude-proxy`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
-      'apikey': SUPABASE_ANON_KEY
-    },
-    body: JSON.stringify({
-      system: systemPrompt,
-      messages: [{ role: 'user', content: input }]
-    })
-  });
-
-  const result = await res.json();
-  const reply = result.content?.[0]?.text || JSON.stringify(result);
-
-  output.innerHTML = `<span class="test-result-info">// Input: ${input}</span>\n\n<span class="test-result-pass">// AI Response:</span>\n${reply}`;
-}
-
-function runSimTest(output) {
-  output.innerHTML = `<span class="test-result-info">Sim UI test — open the teaching app and start a XSS session to test the practice environment.</span>`;
-}
-
-async function runCliTest(input, output) {
-  if (!input) { output.textContent = 'Enter a CLI command to test'; return; }
-  output.textContent = 'Simulating...';
-
-  const { data: { session } } = await sb.auth.getSession();
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/claude-proxy`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
-      'apikey': SUPABASE_ANON_KEY
-    },
-    body: JSON.stringify({
-      system: 'You are a terminal simulator for a cybersecurity teaching platform. Simulate realistic terminal output for penetration testing commands.',
-      messages: [{ role: 'user', content: `Simulate: ${input}` }]
-    })
-  });
-
-  const result = await res.json();
-  output.textContent = result.content?.[0]?.text || 'No response';
-}
-
-// ==================== SESSIONS ====================
-async function loadSessions() {
-  const list = document.getElementById('sessionsList');
-  list.innerHTML = '<div class="loading">Loading...</div>';
-
-  try {
-    const data = await adminReq('get_sessions', { limit: 100 });
-    list.innerHTML = '';
-
-    if (!data.sessions.length) {
-      list.innerHTML = '<div class="loading">No sessions found</div>';
-      return;
-    }
-
-    data.sessions.forEach(s => {
-      const el = document.createElement('div');
-      el.className = 'session-item';
-      el.dataset.id = s.id;
-      el.innerHTML = `
-        <div class="session-item-top">
-          <div class="session-item-id">${s.id.slice(0,12)}...</div>
-          <div class="session-item-status ${s.completed_at ? 'complete' : 'active'}">${s.completed_at ? 'done' : 'active'}</div>
-        </div>
-        <div class="session-item-meta">
-          <span>§${s.section_number || '?'}</span>
-          <span>${s.flag_captured ? '🏴' : ''}</span>
-          <span>${new Date(s.started_at).toLocaleDateString()}</span>
-        </div>`;
-      el.onclick = () => viewSession(s, el);
-      list.appendChild(el);
-    });
-  } catch(e) {
-    list.innerHTML = `<div style="padding:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--danger);">Error: ${e.message}</div>`;
-  }
-}
-
-async function viewSession(session, el) {
-  document.querySelectorAll('.session-item').forEach(i => i.classList.remove('active'));
-  el.classList.add('active');
-  currentSession = session;
-
-  document.getElementById('sessionDetailTitle').textContent = `Session ${session.id.slice(0,8)} — Section ${session.section_number}`;
-  document.getElementById('btnDeleteSession').style.display = '';
-
-  const msgs = document.getElementById('sessionMessages');
-  msgs.innerHTML = '<div class="loading">Loading messages...</div>';
-
-  try {
-    const data = await adminReq('get_session_messages', { session_id: session.id });
-    msgs.innerHTML = '';
-
-    if (!data.messages.length) {
-      msgs.innerHTML = '<div class="loading">No messages in this session</div>';
-      return;
-    }
-
-    data.messages.forEach(m => {
-      const el = document.createElement('div');
-      el.className = `session-msg ${m.role}`;
-      el.innerHTML = `<div class="session-msg-role">${m.role}</div>${escHtml(m.content)}`;
-      msgs.appendChild(el);
-    });
-
-    msgs.scrollTop = msgs.scrollHeight;
-  } catch(e) {
-    msgs.innerHTML = `<div style="color:var(--danger);font-size:11px;font-family:'JetBrains Mono',monospace;">Error: ${e.message}</div>`;
-  }
-}
-
-async function deleteCurrentSession() {
-  if (!currentSession) return;
-  if (!confirm('Delete this session and all messages?')) return;
-
-  try {
-    await adminReq('delete_session', { session_id: currentSession.id });
-    toast('Session deleted', 'ok');
-    currentSession = null;
-    document.getElementById('sessionDetailTitle').textContent = 'Select a session to view';
-    document.getElementById('btnDeleteSession').style.display = 'none';
-    document.getElementById('sessionMessages').innerHTML = '<div class="loading">Select a session</div>';
-    loadSessions();
-  } catch(e) {
-    toast('Delete failed: ' + e.message, 'err');
-  }
-}
-
-// ==================== USERS ====================
-async function loadUsers() {
-  const table = document.getElementById('usersTable');
-  table.innerHTML = '<div class="loading">Loading...</div>';
-
-  try {
-    const data = await adminReq('get_users');
-    const cols = 'grid-template-columns: 2fr 1.5fr 80px 120px 120px 100px';
-
-    table.innerHTML = `
-      <div class="data-table-header" style="${cols}">
-        <span>Email</span><span>ID</span><span>Verified</span><span>Last Login</span><span>Created</span><span>Actions</span>
-      </div>
-      ${data.users.map(u => `
-        <div class="data-table-row" style="${cols}">
-          <span class="highlight">${u.email}</span>
-          <span>${u.id.slice(0,8)}...</span>
-          <span class="${u.confirmed ? 'good' : 'bad'}">${u.confirmed ? '✓' : '✗'}</span>
-          <span>${u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString() : 'Never'}</span>
-          <span>${new Date(u.created_at).toLocaleDateString()}</span>
-          <div class="row-actions">
-            ${u.id !== ADMIN_USER_ID
-              ? `<button class="row-btn danger" onclick="banUser('${u.id}')">Ban</button>`
-              : `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent);">YOU</span>`
-            }
-          </div>
-        </div>`).join('')}`;
-  } catch(e) {
-    table.innerHTML = `<div style="padding:16px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--danger);">Error: ${e.message}</div>`;
-  }
-}
-
-async function banUser(userId) {
-  if (!confirm('Ban this user?')) return;
-  try {
-    await adminReq('disable_user', { user_id: userId, ban: true });
-    toast('User banned', 'ok');
-    loadUsers();
-  } catch(e) {
-    toast('Error: ' + e.message, 'err');
-  }
-}
-
-function showInviteModal() {
-  document.getElementById('inviteModal').style.display = 'flex';
-}
-
-async function createUser() {
-  const email = document.getElementById('inviteEmail').value.trim();
-  const password = document.getElementById('invitePassword').value;
-
-  if (!email || !password) { toast('Email and password required', 'err'); return; }
-
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    // Use admin API via Edge Function
-    await adminReq('create_user', { email, password });
-    toast('User created: ' + email, 'ok');
-    closeModal('inviteModal');
-    loadUsers();
-  } catch(e) {
-    toast('Error: ' + e.message, 'err');
-  }
-}
-
-// ==================== STATS ====================
-async function loadStats() {
-  const grid = document.getElementById('statsGrid');
-  grid.innerHTML = '<div class="loading">Loading...</div>';
-
-  try {
-    const data = await adminReq('get_stats');
-    grid.innerHTML = `
-      <div class="stat-card"><div class="stat-value">${data.total_sessions}</div><div class="stat-label">Total Sessions</div></div>
-      <div class="stat-card"><div class="stat-value">${data.completed_sessions}</div><div class="stat-label">Completed</div></div>
-      <div class="stat-card"><div class="stat-value">${data.flags_captured}</div><div class="stat-label">Flags Captured</div></div>
-      <div class="stat-card"><div class="stat-value">${data.total_messages}</div><div class="stat-label">Total Messages</div></div>
-      <div class="stat-card"><div class="stat-value">${data.user_messages}</div><div class="stat-label">User Messages</div></div>
-      <div class="stat-card"><div class="stat-value">${data.ai_messages}</div><div class="stat-label">AI Responses</div></div>`;
-  } catch(e) {
-    grid.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--danger);">Error: ${e.message}</div>`;
-  }
-}
-
-async function runSql() {
-  const input = document.getElementById('sqlInput').value.trim();
-  const output = document.getElementById('sqlOutput');
-  if (!input) return;
-
-  output.style.display = 'block';
-  output.textContent = 'Running...';
-
-  try {
-    const data = await adminReq('run_sql', { query: input });
-    output.textContent = JSON.stringify(data.rows, null, 2);
-  } catch(e) {
-    output.style.color = 'var(--danger)';
-    output.textContent = 'Error: ' + e.message;
-  }
-}
-
-// ==================== HELPERS ====================
-function closeModal(id) {
-  document.getElementById(id).style.display = 'none';
-}
-
-function escHtml(str) {
-  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-function toast(msg, type = 'ok') {
-  const el = document.createElement('div');
-  el.className = 'toast';
-  el.style.background = type === 'ok' ? 'var(--surface)' : type === 'err' ? 'var(--danger)' : 'var(--warn-dim)';
-  el.style.color = type === 'ok' ? 'var(--accent)' : type === 'err' ? '#fff' : 'var(--warn)';
-  el.style.border = `1px solid ${type === 'ok' ? 'var(--accent)' : type === 'err' ? 'var(--danger)' : 'var(--warn)'}`;
-  el.textContent = msg;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 3000);
-}
-
-// ==================== MOBILE SIDEBAR ====================
-function toggleSidebar() {
-  const sidebars = [
-    document.querySelector('.file-browser'),
-    document.querySelector('.sessions-list'),
-    document.querySelector('.test-sidebar'),
-    document.querySelector('.rules-sidebar')
-  ].filter(Boolean);
-
-  const overlay = document.getElementById('mobileOverlay');
-  const isOpen = sidebars.some(s => s.classList.contains('open'));
-
-  if (isOpen) {
-    sidebars.forEach(s => s.classList.remove('open'));
-    overlay.classList.remove('open');
-  } else {
-    // Open the sidebar for the current panel
-    const activePanel = document.querySelector('.panel.active');
-    if (activePanel) {
-      const sidebar = activePanel.querySelector('.file-browser, .sessions-list, .test-sidebar, .rules-sidebar');
-      if (sidebar) {
-        sidebar.classList.add('open');
-        overlay.classList.add('open');
-      }
-    }
-  }
-}
-
-function closeSidebar() {
-  document.querySelectorAll('.file-browser, .sessions-list, .test-sidebar, .rules-sidebar').forEach(s => s.classList.remove('open'));
-  document.getElementById('mobileOverlay').classList.remove('open');
-}
-
-// ==================== BOOT ====================
-window.addEventListener('load', init);
-</script>
+<div class="mobile-overlay" id="mobileOverlay" onclick="P002Admin.closeSidebar()"></div>
+<!-- ZIP Upload Modal -->
+<div class="modal-overlay" id="zipModal" style="display:none">
+  <div class="modal">
+    <div class="modal-title">Upload Lesson ZIP</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);line-height:1.6;">
+      ZIP must contain .json files in <code>module_intro_web_apps/</code> folder.<br>
+      Each file will be validated before upload. Max 10MB.
+    </div>
+    <input type="file" id="zipFileInput" accept=".zip"
+      style="background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:10px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;width:100%;"/>
+    <div id="zipOutput" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:11px;min-height:60px;white-space:pre-wrap;display:none;"></div>
+    <div class="modal-actions">
+      <button class="modal-btn" onclick="P002Admin.closeModal('zipModal')">Cancel</button>
+      <button class="modal-btn primary" id="btnUploadZip" onclick="P002Admin.handleZipUpload()">▶ Upload & Extract</button>
+    </div>
+  </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="security.js"></script>
+<script src="api.js"></script>
+<script src="admin.js"></script>
 </body>
 </html>
