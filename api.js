@@ -1,5 +1,5 @@
 // ================================================================
-// PROJECT 002 — api.js
+// PROJECT 002 -- api.js
 // Shared API layer for index.html and admin.html
 // Handles all Supabase and Edge Function communication
 // ================================================================
