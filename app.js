@@ -85,7 +85,6 @@ window.P002App = (() => {
     }
     showScreen('homeScreen');
     loadModuleCatalog();
-    loadContinueBanner();
   }
 
   // ==================== AUTH ====================
@@ -388,10 +387,9 @@ TEACHING BALANCE -- CRITICAL:
     conversationHistory = [];
     sectionData = null;
     selectedSection = null;
-    currentNodeIndex = 0;
-    // Reset any open section pickers
-    document.querySelectorAll('.section-picker').forEach(p => p.classList.remove('open'));
-    document.querySelectorAll('.module-card').forEach(c => c.classList.remove('active-module'));
+    currentSectionMeta = null;
+    currentModule = null;
+    currentNodeIndex = 0;;
     backToModules();
   }
 
@@ -999,6 +997,11 @@ TEACHING BALANCE -- CRITICAL:
 
   // ==================== HOME SCREEN ====================
 
+  let currentModule = null;
+  let currentSectionMeta = null;
+
+  const MODULE_INDEX_PATH = 'index.json';
+
   const CATEGORY_ICONS = {
     'Web Fundamentals': '🌐',
     'Web Exploitation': '⚡',
@@ -1013,37 +1016,35 @@ TEACHING BALANCE -- CRITICAL:
     if (!grid) return;
 
     try {
-      // List bucket root folders
-      const items = await P002Api.listBucket('');
-      const folders = items.filter(f => !f.metadata && !f.name.startsWith('.'));
+      // Try index.json first (fast path)
+      let modules = [];
+      try {
+        const text = await P002Api.downloadFile(MODULE_INDEX_PATH);
+        const parsed = JSON.parse(text);
+        modules = parsed.modules || [];
+      } catch(e) {
+        // Fall back to listing bucket and reading manifests
+        const items = await P002Api.listBucket('');
+        const folders = items.filter(f => !f.metadata && !f.name.startsWith('.'));
+        modules = folders.map(f => ({
+          key: f.name,
+          title: f.name.replace(/module_|_/g, ' ').trim().replace(/\w/g, c => c.toUpperCase()),
+          category: 'Other',
+          difficulty: 'intermediate',
+          section_count: 0,
+          estimated_hours: 0,
+          icon: '📚'
+        }));
+      }
 
-      if (!folders.length) {
+      if (!modules.length) {
         grid.innerHTML = '<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">No modules found. Upload content via the admin panel.</div>';
         return;
       }
 
-      // Load manifests for all folders in parallel
-      const manifests = await Promise.all(folders.map(async (folder) => {
-        try {
-          const text = await P002Api.downloadFile(folder.name + '/manifest.json');
-          return JSON.parse(text);
-        } catch(e) {
-          // No manifest — build a minimal one from folder name
-          return {
-            module_key: folder.name,
-            title: folder.name.replace(/module_|_/g, ' ').trim().replace(/\w/g, c => c.toUpperCase()),
-            description: '',
-            difficulty: 'intermediate',
-            category: 'Other',
-            estimated_hours: 0,
-            sections: []
-          };
-        }
-      }));
-
       // Group by category
       const categories = {};
-      manifests.forEach(m => {
+      modules.forEach(m => {
         const cat = m.category || 'Other';
         if (!categories[cat]) categories[cat] = [];
         categories[cat].push(m);
@@ -1053,18 +1054,14 @@ TEACHING BALANCE -- CRITICAL:
 
       Object.entries(categories).forEach(([cat, mods]) => {
         const group = document.createElement('div');
-        group.className = 'category-group';
+        group.style.cssText = 'margin-bottom:8px;';
 
         const label = document.createElement('div');
-        label.className = 'category-label';
+        label.style.cssText = 'padding:16px 16px 8px;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;color:var(--text-dim);';
         label.textContent = cat;
         group.appendChild(label);
 
-        mods.forEach((manifest, idx) => {
-          const card = buildManifestCard(manifest, idx);
-          group.appendChild(card);
-        });
-
+        mods.forEach(m => group.appendChild(buildIndexCard(m)));
         grid.appendChild(group);
       });
 
@@ -1073,138 +1070,155 @@ TEACHING BALANCE -- CRITICAL:
     }
   }
 
-  function buildManifestCard(manifest, idx) {
+  function buildIndexCard(m) {
     const card = document.createElement('div');
-    card.className = 'module-card';
-    card.dataset.module = manifest.module_key;
+    card.style.cssText = 'margin:0 16px 8px;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color 0.15s,transform 0.15s;';
 
-    const icon = CATEGORY_ICONS[manifest.category] || '📚';
-    const totalMins = manifest.sections.reduce((a, s) => a + (s.minutes || 0), 0);
-    const hours = totalMins > 0 ? (totalMins / 60).toFixed(1) + 'h' : (manifest.estimated_hours + 'h');
-    const secCount = manifest.sections.length;
+    const icon = m.icon || CATEGORY_ICONS[m.category] || '📚';
+    const secs = m.section_count || 0;
+    const hrs = m.estimated_hours || 0;
+    const diff = m.difficulty || 'intermediate';
+    const diffColors = { beginner: 'var(--success)', intermediate: 'var(--warn)', advanced: 'var(--accent)' };
 
-    const header = card.querySelector ? null : null; // built below
-
-    const headerDiv = card.innerHTML =
-      '<div class="module-card-header">' +
-        '<div class="module-icon">' + icon + '</div>' +
-        '<div class="module-header-info">' +
-          '<div class="module-difficulty-badge ' + (manifest.difficulty || 'intermediate') + '">' + (manifest.difficulty || 'intermediate') + '</div>' +
-          '<div class="module-card-title">' + P002Security.escapeHtml(manifest.title) + '</div>' +
-          '<div class="module-card-meta">' + (secCount > 0 ? secCount + ' sections' : 'No sections') + ' &middot; ' + hours + ' &middot; AI coached</div>' +
+    card.innerHTML =
+      '<div style="padding:14px 16px;display:flex;align-items:center;gap:14px;">' +
+        '<div style="width:44px;height:44px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(255,77,77,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">' + icon + '</div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:' + (diffColors[diff] || 'var(--warn)') + ';margin-bottom:4px;">' + diff + '</div>' +
+          '<div style="font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--text);line-height:1.2;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + P002Security.escapeHtml(m.title) + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);">' + (secs > 0 ? secs + ' sections' : 'Loading...') + (hrs > 0 ? ' &middot; ' + hrs + 'h' : '') + '</div>' +
         '</div>' +
-        '<div class="module-chevron">&#9660;</div>' +
-      '</div>' +
-      '<div class="module-sections" id="sections_' + manifest.module_key + '">' +
-        (manifest.description ? '<div class="module-desc">' + P002Security.escapeHtml(manifest.description) + '</div>' : '') +
-        manifest.sections.map(function(s, i) {
-          return '<div class="section-row ' + (s.has_flag ? 'has-flag' : '') + '" ' +
-            'data-file="' + manifest.module_key + '/' + s.file + '" ' +
-            'data-title="' + P002Security.escapeHtml(s.title) + '" ' +
-            'data-meta="' + P002Security.escapeHtml(manifest.title) + ' · Section ' + (i+1) + '/' + secCount + '">' +
-            '<div class="section-num">' + String(i+1).padStart(2,'0') + '</div>' +
-            '<div class="section-info">' +
-              '<div class="section-title">' + P002Security.escapeHtml(s.title) + '</div>' +
-              '<div class="section-meta-row">' +
-                '<span class="section-time">⏱ ' + (s.minutes || '?') + ' min</span>' +
-                '<span class="section-diff ' + (s.difficulty || 'beginner') + '">' + (s.difficulty || '') + '</span>' +
-              '</div>' +
-            '</div>' +
-            '<div class="section-flag">⚑</div>' +
-          '</div>';
-        }).join('') +
+        '<div style="color:var(--text-dim);font-size:16px;">›</div>' +
       '</div>';
 
-    // Wire header click via event listener
-    card.querySelector('.module-card-header').addEventListener('click', function() {
-      P002App.toggleManifestCard(manifest.module_key);
-    });
+    card.addEventListener('mouseenter', () => { card.style.borderColor = 'var(--border2)'; card.style.transform = 'translateX(2px)'; });
+    card.addEventListener('mouseleave', () => { card.style.borderColor = 'var(--border)'; card.style.transform = ''; });
+    card.addEventListener('click', () => openModule(m.key || m.module_key));
 
-    // Wire section row clicks
-    card.querySelectorAll('.section-row').forEach(function(row) {
-      row.addEventListener('click', function() {
-        P002App.selectSection(row);
-      });
-    });
-
-        return card;
+    return card;
   }
 
-  function toggleManifestCard(moduleKey) {
-    const card = document.querySelector('[data-module="' + moduleKey + '"]');
-    if (!card) return;
-    const isExpanded = card.classList.contains('expanded');
-    // Close all
-    document.querySelectorAll('.module-card').forEach(c => c.classList.remove('expanded'));
-    if (!isExpanded) card.classList.add('expanded');
-  }
+  async function openModule(moduleKey) {
+    selectedModule = moduleKey;
+    showScreen('moduleScreen');
 
-  async function selectSection(el) {
-    // Deselect all
-    document.querySelectorAll('.section-row').forEach(r => r.classList.remove('selected'));
-    el.classList.add('selected');
-
-    const filePath = el.dataset.file;
-    const title = el.dataset.title;
-    const meta = el.dataset.meta;
-
-    // Show launch bar immediately
-    const launchBar = document.getElementById('launchBar');
-    const launchTitle = document.getElementById('launchBarTitle');
-    const launchMeta = document.getElementById('launchBarMeta');
-    const launchBtn = document.getElementById('launchBtn');
-
-    launchTitle.textContent = title;
-    launchMeta.textContent = meta + ' — Loading...';
-    launchBar.classList.add('visible');
-    launchBtn.disabled = true;
-    launchBtn.textContent = 'Loading...';
-
-    sectionData = null;
-    selectedSection = filePath;
-    selectedModule = filePath.split('/')[0];
+    // Reset module detail screen
+    document.getElementById('moduleDetailTitle').textContent = 'Loading...';
+    document.getElementById('moduleDetailDesc').textContent = '';
+    document.getElementById('moduleDetailCategory').textContent = '';
+    document.getElementById('moduleDetailStats').innerHTML = '';
+    document.getElementById('moduleSectionList').innerHTML = '<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">Loading sections...</div>';
 
     try {
-      const text = await P002Api.downloadFile(filePath);
-      const validation = P002Security.validateLessonJson(text);
-      if (!validation.ok) {
-        launchMeta.textContent = 'Invalid section file';
-        return;
-      }
-      sectionData = validation.data;
-      const lesson = sectionData.lesson;
-      launchMeta.textContent = meta;
-      launchBtn.disabled = false;
-      launchBtn.textContent = 'Start Session →';
+      const text = await P002Api.downloadFile(moduleKey + '/manifest.json');
+      const manifest = JSON.parse(text);
+      currentModule = manifest;
+      renderModuleDetail(manifest);
     } catch(e) {
-      launchMeta.textContent = 'Failed to load: ' + P002Security.escapeHtml(e.message);
-      launchBtn.textContent = 'Error';
+      document.getElementById('moduleDetailTitle').textContent = 'Failed to load';
+      document.getElementById('moduleSectionList').innerHTML = '<div style="padding:20px 16px;color:var(--danger);font-size:13px;">' + P002Security.escapeHtml(e.message) + '</div>';
     }
   }
 
-  async function loadContinueBanner() {
+  function renderModuleDetail(manifest) {
+    const totalMins = manifest.sections.reduce((a, s) => a + (s.minutes || 0), 0);
+    const hours = totalMins > 0 ? (totalMins / 60).toFixed(1) : (manifest.estimated_hours || '?');
+    const flags = manifest.sections.filter(s => s.has_flag).length;
+
+    document.getElementById('moduleDetailCategory').textContent = (manifest.category || '') + (manifest.difficulty ? ' · ' + manifest.difficulty : '');
+    document.getElementById('moduleDetailTitle').textContent = manifest.title;
+    document.getElementById('moduleDetailDesc').textContent = manifest.description || '';
+    document.getElementById('moduleDetailStats').innerHTML =
+      '<div class="module-stat"><span class="module-stat-value">' + manifest.sections.length + '</span><span class="module-stat-label">Sections</span></div>' +
+      '<div class="module-stat"><span class="module-stat-value">' + hours + 'h</span><span class="module-stat-label">Estimated</span></div>' +
+      (flags > 0 ? '<div class="module-stat"><span class="module-stat-value">' + flags + '</span><span class="module-stat-label">Flags</span></div>' : '');
+
+    const list = document.getElementById('moduleSectionList');
+    list.innerHTML = '';
+
+    manifest.sections.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.className = 'section-row' + (s.has_flag ? ' has-flag' : '');
+      row.innerHTML =
+        '<div class="section-num">' + String(i + 1).padStart(2, '0') + '</div>' +
+        '<div class="section-info">' +
+          '<div class="section-title">' + P002Security.escapeHtml(s.title) + '</div>' +
+          '<div class="section-meta-row">' +
+            '<span class="section-time">⏱ ' + (s.minutes || '?') + ' min</span>' +
+            '<span class="section-diff ' + (s.difficulty || 'beginner') + '">' + (s.difficulty || '') + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="section-flag">⚑</div>' +
+        '<div class="section-chevron">›</div>';
+
+      row.addEventListener('click', () => openSectionPreview(s, i, manifest));
+      list.appendChild(row);
+    });
+  }
+
+  async function openSectionPreview(sectionMeta, idx, manifest) {
+    currentSectionMeta = sectionMeta;
+    selectedSection = manifest.module_key + '/' + sectionMeta.file;
+    sectionData = null;
+
+    document.getElementById('sectionBackLabel').textContent = manifest.title;
+    document.getElementById('sectionPreviewMeta').textContent =
+      'Section ' + (idx + 1) + ' of ' + manifest.sections.length +
+      ' · ' + (sectionMeta.difficulty || '') +
+      ' · ' + (sectionMeta.minutes || '?') + ' min';
+    document.getElementById('sectionPreviewTitle').textContent = sectionMeta.title;
+    document.getElementById('sectionPreviewDesc').textContent = sectionMeta.description || '';
+
+    // Build preview body
+    const body = document.getElementById('sectionPreviewBody');
+    body.innerHTML = '';
+
+    if (sectionMeta.has_flag) {
+      const challenge = document.createElement('div');
+      challenge.className = 'section-challenge-box';
+      challenge.innerHTML =
+        '<div class="section-challenge-label">⚑ Practice Challenge</div>' +
+        '<div class="section-challenge-text">' + P002Security.escapeHtml(sectionMeta.practice_question || 'Hands-on practice exercise included') + '</div>';
+      body.appendChild(challenge);
+    }
+
+    showScreen('sectionScreen');
+
+    // Load section JSON in background
+    const btn = document.getElementById('sectionStartBtn');
+    const status = document.getElementById('sectionStartStatus');
+    btn.disabled = true;
+    status.textContent = 'Loading section...';
+
     try {
-      const last = await P002Api.getLastSession();
-      if (!last) return;
-      const banner = document.getElementById('continueBanner');
-      const title = document.getElementById('continueTitle');
-      const meta = document.getElementById('continueMeta');
-      if (banner && title && meta) {
-        title.textContent = last.lesson_title || 'Continue where you left off';
-        meta.textContent = (last.module_key || '').replace(/module_|_/g, ' ').trim() + ' · Section ' + (last.section_number || '?');
-        banner.classList.add('visible');
+      const text = await P002Api.downloadFile(selectedSection);
+      const validation = P002Security.validateLessonJson(text);
+      if (!validation.ok) {
+        status.textContent = '✗ ' + validation.errors[0];
+        return;
       }
-    } catch(e) {}
+      sectionData = validation.data;
+      btn.disabled = false;
+      status.textContent = '';
+    } catch(e) {
+      status.textContent = '✗ Failed to load: ' + P002Security.escapeHtml(e.message);
+    }
   }
 
-  function resumeLastSession() {
-    // For now just scroll to modules
-    document.getElementById('moduleGrid').scrollIntoView({ behavior: 'smooth' });
+  function backToHome() {
+    currentModule = null;
+    showScreen('homeScreen');
   }
 
-  let selectedSection = null;
+  function backToModule() {
+    currentSectionMeta = null;
+    sectionData = null;
+    showScreen('moduleScreen');
+  }
 
-  // ==================== PUBLIC API ====================
+  async function loadContinueBanner() {} // reserved for later
+
+    // ==================== PUBLIC API ====================
   return {
     init,
     handleAuth,
@@ -1213,9 +1227,10 @@ TEACHING BALANCE -- CRITICAL:
     selectModule,
     backToModules,
     loadModuleCatalog,
-    toggleManifestCard,
-    selectSection,
-    resumeLastSession,
+    openModule,
+    backToHome,
+    backToModule,
+    openSectionPreview,
     startSession,
     endSession,
     goToSetup,
