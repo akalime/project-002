@@ -987,7 +987,6 @@ body {
 .auth-btn:hover { filter: brightness(1.1); }
 .auth-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* ===== MOBILE ===== */
 /* ===== BOTTOM NAV ===== */
 .bottom-nav {
   display: none;
@@ -1028,9 +1027,7 @@ body {
 
 @media (max-width: 768px) {
   .bottom-nav { display: flex; }
-  .topbar-nav {
-    display: none;
-  }
+  .topbar-nav { display: none; }
   .topbar-btn { font-size: 10px; padding: 4px 8px; white-space: nowrap; }
   .topbar-logo { font-size: 14px; }
   .topbar-badge { display: none; }
@@ -1048,9 +1045,7 @@ body {
   }
   .file-browser.open { left: 0; }
 
-  .fb-toggle {
-    display: flex !important;
-  }
+  .fb-toggle { display: flex !important; }
 
   .sessions-list {
     position: fixed;
@@ -1147,10 +1142,8 @@ body {
   .mobile-bottom-nav-btn.active { color: var(--accent); }
   .mobile-bottom-nav-btn:hover { color: var(--text); }
 
-  /* Push main content above bottom nav */
   .main { padding-bottom: 56px; }
 
-  /* Topbar adjustments */
   .topbar { padding: 0 12px; }
   .topbar-logo { font-size: 14px; letter-spacing: 2px; }
   .topbar-badge { display: none; }
@@ -1240,6 +1233,7 @@ body {
             <button class="fb-btn" onclick="P002Admin.refreshFiles()" title="Refresh">↻</button>
             <button class="fb-btn" onclick="P002Admin.showNewFileModal()" title="New file">+</button>
             <button class="fb-btn" onclick="P002Admin.showZipModal()" title="Upload ZIP">📦</button>
+            <button class="fb-btn" onclick="P002Admin.rebuildModuleIndex()" title="Rebuild Module Index" id="btnRebuildIndex">⟳</button>
             <button class="fb-btn fb-toggle" onclick="P002Admin.toggleSidebar()" title="Close">✕</button>
           </div>
         </div>
@@ -1259,8 +1253,8 @@ body {
           <div class="editor-empty-icon">📄</div>
           <div class="editor-empty-text">Select a file to edit</div>
         </div>
-        <textarea class="editor-textarea" id="editorTextarea" style="display:none" 
-          oninput="P002Admin.onEditorChange()" 
+        <textarea class="editor-textarea" id="editorTextarea" style="display:none"
+          oninput="P002Admin.onEditorChange()"
           onkeydown="P002Admin.handleEditorKey(event)"
           spellcheck="false"></textarea>
         <div class="editor-statusbar" id="editorStatusbar" style="display:none">
@@ -1293,7 +1287,7 @@ body {
           <div class="editor-filename" id="rulesFilename">System Prompt</div>
           <button class="editor-btn" onclick="P002Admin.saveRule()" id="btnSaveRule">💾 Save Rule</button>
         </div>
-        <textarea class="editor-textarea" id="rulesTextarea" spellcheck="false" 
+        <textarea class="editor-textarea" id="rulesTextarea" spellcheck="false"
           placeholder="Select a rule to edit..." style="flex:1"></textarea>
         <div class="editor-statusbar">
           <span class="editor-status-item">Changes apply to next session</span>
@@ -1409,10 +1403,6 @@ body {
 
     <!-- STATS PANEL -->
     <div class="panel" id="panelStats">
-      <div style="padding:16px;border-bottom:1px solid var(--border);">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:10px;">Module index is used by the app to list available modules. Rebuild after uploading new modules.</div>
-        <button class="editor-action-btn" id="btnRebuildIndex" onclick="P002Admin.rebuildModuleIndex()" style="background:var(--accent);color:#fff;border-color:var(--accent);">⟳ Rebuild Module Index</button>
-      </div>
       <div class="stats-panel">
         <div class="panel-header">
           <div class="panel-title">Platform Stats</div>
@@ -1471,7 +1461,25 @@ body {
   </div>
 </div>
 
-<!-- Bottom Nav (mobile only) -->
+<!-- ZIP Upload Modal -->
+<div class="modal-overlay" id="zipModal" style="display:none">
+  <div class="modal">
+    <div class="modal-title">Upload Lesson ZIP</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);line-height:1.6;">
+      ZIP must contain .json files in <code>module_intro_web_apps/</code> folder.<br>
+      Each file will be validated before upload. Max 10MB.
+    </div>
+    <input type="file" id="zipFileInput" accept=".zip"
+      style="background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:10px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;width:100%;"/>
+    <div id="zipOutput" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:11px;min-height:60px;white-space:pre-wrap;display:none;"></div>
+    <div class="modal-actions">
+      <button class="modal-btn" onclick="P002Admin.closeModal('zipModal')">Cancel</button>
+      <button class="modal-btn primary" id="btnUploadZip" onclick="P002Admin.handleZipUpload()">▶ Upload & Extract</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Nav (legacy, hidden on mobile in favor of mobile-bottom-nav) -->
 <div class="bottom-nav" id="bottomNav">
   <button class="bottom-nav-btn active" id="bnLessons" onclick="P002Admin.switchPanel('lessons')">
     <span class="bn-icon">📁</span>Files
@@ -1523,24 +1531,6 @@ body {
 
 <!-- Mobile overlay -->
 <div class="mobile-overlay" id="mobileOverlay" onclick="P002Admin.closeSidebar()"></div>
-<!-- ZIP Upload Modal -->
-<div class="modal-overlay" id="zipModal" style="display:none">
-  <div class="modal">
-    <div class="modal-title">Upload Lesson ZIP</div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);line-height:1.6;">
-      ZIP must contain .json files in <code>module_intro_web_apps/</code> folder.<br>
-      Each file will be validated before upload. Max 10MB.
-    </div>
-    <input type="file" id="zipFileInput" accept=".zip"
-      style="background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:10px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;width:100%;"/>
-    <div id="zipOutput" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:11px;min-height:60px;white-space:pre-wrap;display:none;"></div>
-    <div class="modal-actions">
-      <button class="modal-btn" onclick="P002Admin.closeModal('zipModal')">Cancel</button>
-      <button class="modal-btn primary" id="btnUploadZip" onclick="P002Admin.handleZipUpload()">▶ Upload & Extract</button>
-    </div>
-  </div>
-</div>
-
 
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="/project-002/security.js"></script>
