@@ -1,1547 +1,852 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Project 002 — Admin</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,700;1,400&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;700&display=swap');
-
-:root {
-  --bg: #07070f;
-  --surface: #0d0d1a;
-  --surface2: #121220;
-  --surface3: #181828;
-  --border: #1e1e32;
-  --border2: #2a2a44;
-  --accent: #00e5a0;
-  --accent-dim: rgba(0,229,160,0.1);
-  --accent-glow: rgba(0,229,160,0.25);
-  --danger: #ff3864;
-  --danger-dim: rgba(255,56,100,0.1);
-  --warn: #ffbe00;
-  --warn-dim: rgba(255,190,0,0.1);
-  --info: #4fc3f7;
-  --text: #e0e0f0;
-  --text-dim: #7070a0;
-  --text-muted: #3a3a5a;
-  --code: #a0e0ff;
-  --code-bg: #050510;
-  --green: #00e676;
-  --red: #ff1744;
-}
-
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  height: 100vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-/* ===== TOP BAR ===== */
-.topbar {
-  height: 48px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  padding: 0 20px;
-  gap: 20px;
-  flex-shrink: 0;
-  z-index: 50;
-}
-
-.topbar-logo {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 18px;
-  letter-spacing: 4px;
-  color: var(--accent);
-  text-shadow: 0 0 16px var(--accent-glow);
-}
-
-.topbar-badge {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 2px;
-  color: var(--danger);
-  background: var(--danger-dim);
-  border: 1px solid var(--danger);
-  padding: 2px 8px;
-  border-radius: 3px;
-  text-transform: uppercase;
-}
-
-.topbar-nav {
-  display: flex;
-  gap: 4px;
-  margin-left: 20px;
-}
-
-.topbar-btn {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  padding: 5px 14px;
-  border-radius: 4px;
-  cursor: pointer;
-  border: none;
-  background: transparent;
-  color: var(--text-dim);
-  transition: all 0.15s;
-  letter-spacing: 0.5px;
-}
-
-.topbar-btn:hover { color: var(--text); background: var(--surface2); }
-.topbar-btn.active { color: var(--accent); background: var(--accent-dim); }
-
-.topbar-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.topbar-status {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--text-dim);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.status-dot {
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  background: var(--text-muted);
-}
-.status-dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
-.status-dot.warn { background: var(--warn); }
-.status-dot.err { background: var(--red); }
-
-.topbar-action-btn {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  padding: 4px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  border: 1px solid var(--border2);
-  background: transparent;
-  color: var(--text-dim);
-  transition: all 0.15s;
-}
-.topbar-action-btn:hover { border-color: var(--danger); color: var(--danger); }
-
-/* ===== MAIN LAYOUT ===== */
-.main {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-/* ===== PANELS ===== */
-.panel {
-  display: none;
-  flex: 1;
-  overflow: hidden;
-}
-.panel.active { display: flex; }
-
-/* ===== LESSONS PANEL ===== */
-.file-browser {
-  width: 260px;
-  border-right: 1px solid var(--border);
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-
-.fb-header {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.fb-title {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--text-dim);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-}
-
-.fb-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.fb-btn {
-  font-size: 14px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: var(--text-dim);
-  padding: 2px 4px;
-  border-radius: 3px;
-  transition: all 0.15s;
-  line-height: 1;
-}
-.fb-btn:hover { color: var(--accent); background: var(--accent-dim); }
-
-.fb-tree {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.fb-folder {
-  margin-bottom: 4px;
-}
-
-.fb-folder-name {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--text-dim);
-  padding: 6px 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.15s;
-}
-.fb-folder-name:hover { background: var(--surface2); }
-.fb-folder-name .fb-arrow { transition: transform 0.2s; font-size: 9px; }
-.fb-folder-name.open .fb-arrow { transform: rotate(90deg); }
-
-.fb-files {
-  padding-left: 16px;
-}
-
-.fb-file {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--text-dim);
-  padding: 5px 8px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: all 0.15s;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  position: relative;
-}
-.fb-file:hover { background: var(--surface2); color: var(--text); }
-.fb-file.active { background: var(--accent-dim); color: var(--accent); border-left: 2px solid var(--accent); }
-.fb-file .fb-file-icon { font-size: 10px; opacity: 0.6; }
-
-.fb-file-actions {
-  display: none;
-  position: absolute;
-  right: 6px;
-  gap: 4px;
-}
-.fb-file:hover .fb-file-actions { display: flex; }
-
-.fb-file-action {
-  font-size: 10px;
-  padding: 1px 4px;
-  background: var(--surface3);
-  border: 1px solid var(--border2);
-  border-radius: 2px;
-  cursor: pointer;
-  color: var(--text-dim);
-  transition: all 0.15s;
-}
-.fb-file-action:hover { color: var(--danger); border-color: var(--danger); }
-
-/* Editor area */
-.editor-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background: var(--code-bg);
-}
-
-.editor-topbar {
-  height: 40px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  gap: 12px;
-  flex-shrink: 0;
-}
-
-.editor-filename {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  color: var(--text-dim);
-  flex: 1;
-}
-
-.editor-filename.dirty { color: var(--warn); }
-.editor-filename.dirty::after { content: ' ●'; color: var(--warn); }
-
-.editor-btn {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  padding: 4px 14px;
-  border-radius: 4px;
-  cursor: pointer;
-  border: 1px solid var(--border2);
-  background: transparent;
-  color: var(--text-dim);
-  transition: all 0.15s;
-}
-.editor-btn:hover { border-color: var(--accent); color: var(--accent); }
-.editor-btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
-.editor-btn.primary:hover { filter: brightness(1.1); }
-.editor-btn.danger { border-color: var(--danger); color: var(--danger); }
-
-.editor-validate-status {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  padding: 3px 10px;
-  border-radius: 3px;
-}
-.editor-validate-status.ok { color: var(--green); background: rgba(0,230,118,0.1); }
-.editor-validate-status.err { color: var(--red); background: rgba(255,23,68,0.1); }
-
-.editor-textarea {
-  flex: 1;
-  background: var(--code-bg);
-  color: var(--code);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  padding: 16px 20px;
-  border: none;
-  outline: none;
-  resize: none;
-  line-height: 1.7;
-  tab-size: 2;
-  overflow: auto;
-}
-
-.editor-empty {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: var(--text-muted);
-}
-
-.editor-empty-icon { font-size: 48px; opacity: 0.3; }
-.editor-empty-text {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-}
-
-.editor-statusbar {
-  height: 24px;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  gap: 16px;
-  flex-shrink: 0;
-}
-
-.editor-status-item {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
-/* ===== USERS PANEL ===== */
-.users-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 24px;
-  gap: 20px;
-  overflow-y: auto;
-}
-
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.panel-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 24px;
-  letter-spacing: 3px;
-  color: var(--text);
-}
-
-.panel-action-btn {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  padding: 6px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  border: 1px solid var(--accent);
-  background: var(--accent-dim);
-  color: var(--accent);
-  transition: all 0.15s;
-}
-.panel-action-btn:hover { background: var(--accent); color: #000; }
-
-.data-table {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.data-table-header {
-  display: grid;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface2);
-}
-
-.data-table-header span {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-}
-
-.data-table-row {
-  display: grid;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-  align-items: center;
-  transition: background 0.15s;
-}
-.data-table-row:last-child { border-bottom: none; }
-.data-table-row:hover { background: var(--surface2); }
-
-.data-table-row span {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
-.data-table-row span.highlight { color: var(--text); }
-.data-table-row span.good { color: var(--green); }
-.data-table-row span.bad { color: var(--red); }
-.data-table-row span.warn { color: var(--warn); }
-
-.row-actions { display: flex; gap: 6px; }
-
-.row-btn {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  padding: 3px 10px;
-  border-radius: 3px;
-  cursor: pointer;
-  border: 1px solid var(--border2);
-  background: transparent;
-  color: var(--text-muted);
-  transition: all 0.15s;
-}
-.row-btn:hover { border-color: var(--accent); color: var(--accent); }
-.row-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
-
-/* ===== SESSIONS PANEL ===== */
-.sessions-split {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-.sessions-list {
-  width: 380px;
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-
-.sessions-list-header {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.sessions-list-title {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--text-dim);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-}
-
-.sessions-list-body {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.session-item {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.session-item:hover { background: var(--surface2); }
-.session-item.active { background: var(--accent-dim); border-left: 2px solid var(--accent); }
-
-.session-item-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
-
-.session-item-id {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--text);
-}
-
-.session-item-status {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-.session-item-status.complete { background: rgba(0,230,118,0.1); color: var(--green); }
-.session-item-status.active { background: var(--accent-dim); color: var(--accent); }
-
-.session-item-meta {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--text-muted);
-  display: flex;
-  gap: 10px;
-}
-
-.session-detail {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background: var(--code-bg);
-}
-
-.session-detail-header {
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.session-detail-title {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  color: var(--text);
-  flex: 1;
-}
-
-.session-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.session-msg {
-  padding: 10px 14px;
-  border-radius: 6px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  line-height: 1.6;
-  max-width: 85%;
-}
-
-.session-msg.user {
-  background: var(--danger-dim);
-  border: 1px solid rgba(255,56,100,0.2);
-  align-self: flex-end;
-  color: var(--text);
-}
-
-.session-msg.assistant {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  align-self: flex-start;
-  color: var(--text-dim);
-}
-
-.session-msg-role {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 4px;
-  opacity: 0.5;
-}
-
-/* ===== STATS PANEL ===== */
-.stats-panel {
-  flex: 1;
-  padding: 24px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
-}
-
-.stat-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 20px;
-  position: relative;
-  overflow: hidden;
-}
-
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: var(--accent);
-}
-
-.stat-value {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 42px;
-  color: var(--accent);
-  line-height: 1;
-  letter-spacing: 2px;
-}
-
-.stat-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  margin-top: 6px;
-}
-
-/* ===== TEST MODE PANEL ===== */
-.test-panel {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-.test-sidebar {
-  width: 260px;
-  border-right: 1px solid var(--border);
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-  padding: 16px;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.test-sidebar-title {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--text-dim);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.test-item {
-  padding: 10px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  border: 1px solid var(--border);
-  background: var(--surface2);
-  transition: all 0.15s;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.test-item:hover { border-color: var(--accent); }
-.test-item.active { border-color: var(--accent); background: var(--accent-dim); }
-
-.test-item-icon { font-size: 16px; }
-
-.test-item-info {}
-.test-item-name {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--text);
-}
-.test-item-desc {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
-.test-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.test-header {
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.test-title {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  color: var(--text);
-}
-
-.test-run-btn {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  padding: 6px 20px;
-  border-radius: 4px;
-  cursor: pointer;
-  border: none;
-  background: var(--accent);
-  color: #000;
-  font-weight: 700;
-  transition: all 0.15s;
-}
-.test-run-btn:hover { filter: brightness(1.1); }
-
-.test-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-}
-
-.test-section {
-  margin-bottom: 20px;
-}
-
-.test-section-title {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--text-muted);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-bottom: 10px;
-}
-
-.test-input {
-  width: 100%;
-  background: var(--code-bg);
-  border: 1px solid var(--border2);
-  color: var(--code);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  padding: 10px 14px;
-  border-radius: 6px;
-  outline: none;
-  resize: vertical;
-  min-height: 80px;
-}
-.test-input:focus { border-color: var(--accent); }
-
-.test-output {
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 14px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--text-dim);
-  white-space: pre-wrap;
-  min-height: 100px;
-  line-height: 1.6;
-}
-
-.test-result-pass { color: var(--green); }
-.test-result-fail { color: var(--red); }
-.test-result-info { color: var(--info); }
-
-/* ===== AI RULES PANEL ===== */
-.rules-panel {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-.rules-sidebar {
-  width: 220px;
-  border-right: 1px solid var(--border);
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-
-.rules-sidebar-section {
-  padding: 12px;
-  border-bottom: 1px solid var(--border);
-}
-
-.rules-sidebar-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  color: var(--text-muted);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-}
-
-.rules-item {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  padding: 7px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--text-dim);
-  transition: all 0.15s;
-  margin-bottom: 2px;
-}
-.rules-item:hover { background: var(--surface2); color: var(--text); }
-.rules-item.active { background: var(--accent-dim); color: var(--accent); }
-
-.rules-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* ===== MODAL ===== */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.8);
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(4px);
-}
-
-.modal {
-  background: var(--surface);
-  border: 1px solid var(--border2);
-  border-radius: 10px;
-  padding: 28px;
-  width: 100%;
-  max-width: 440px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.modal-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 20px;
-  letter-spacing: 3px;
-  color: var(--text);
-}
-
-.modal-input {
-  background: var(--bg);
-  border: 1px solid var(--border2);
-  color: var(--text);
-  padding: 10px 14px;
-  border-radius: 6px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  outline: none;
-  width: 100%;
-}
-.modal-input:focus { border-color: var(--accent); }
-
-.modal-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-.modal-btn {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  padding: 7px 18px;
-  border-radius: 4px;
-  cursor: pointer;
-  border: 1px solid var(--border2);
-  background: transparent;
-  color: var(--text-dim);
-  transition: all 0.15s;
-}
-.modal-btn:hover { border-color: var(--text); color: var(--text); }
-.modal-btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
-.modal-btn.primary:hover { filter: brightness(1.1); }
-
-/* ===== LOADING ===== */
-.loading {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--text-muted);
-  letter-spacing: 2px;
-}
-
-/* ===== AUTH SCREEN ===== */
-.auth-screen {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.auth-box {
-  background: var(--surface);
-  border: 1px solid var(--border2);
-  border-radius: 12px;
-  padding: 40px;
-  width: 360px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.auth-logo {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 28px;
-  letter-spacing: 4px;
-  color: var(--accent);
-  text-align: center;
-}
-
-.auth-sub {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--text-muted);
-  text-align: center;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-top: -12px;
-}
-
-.auth-error {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--danger);
-  text-align: center;
-  padding: 8px;
-  background: var(--danger-dim);
-  border: 1px solid var(--danger);
-  border-radius: 4px;
-  display: none;
-}
-
-.auth-btn {
-  background: var(--accent);
-  color: #000;
-  border: none;
-  padding: 12px;
-  border-radius: 6px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.auth-btn:hover { filter: brightness(1.1); }
-.auth-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* ===== MOBILE ===== */
-/* ===== BOTTOM NAV ===== */
-.bottom-nav {
-  display: none;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 56px;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  z-index: 200;
-  flex-direction: row;
-  align-items: stretch;
-}
-
-.bottom-nav-btn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: var(--text-muted);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 8px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  transition: color 0.15s;
-  padding: 0;
-}
-
-.bottom-nav-btn .bn-icon { font-size: 18px; line-height: 1; }
-.bottom-nav-btn:hover { color: var(--text-dim); }
-.bottom-nav-btn.active { color: var(--accent); }
-
-@media (max-width: 768px) {
-  .bottom-nav { display: flex; }
-  .topbar-nav {
-    display: none;
-  }
-  .topbar-btn { font-size: 10px; padding: 4px 8px; white-space: nowrap; }
-  .topbar-logo { font-size: 14px; }
-  .topbar-badge { display: none; }
-
-  .file-browser {
-    position: fixed;
-    left: -100%;
-    top: 48px;
-    bottom: 0;
-    z-index: 100;
-    width: 80vw;
-    max-width: 300px;
-    transition: left 0.25s ease;
-    box-shadow: 4px 0 20px rgba(0,0,0,0.5);
-  }
-  .file-browser.open { left: 0; }
-
-  .fb-toggle {
-    display: flex !important;
+// ================================================================
+// PROJECT 002 -- admin.js
+// Admin panel logic for admin.html
+// Depends on: security.js, api.js
+// ================================================================
+
+const P002Admin = (() => {
+
+  // ==================== STATE ====================
+  let currentUser = null;
+  let currentFile = null;
+  let editorDirty = false;
+  let currentSession = null;
+  let currentTest = 'lesson';
+  let currentRule = 'system_prompt';
+
+  // ==================== INIT ====================
+  async function init() {
+    try {
+      const session = await P002Api.getSession();
+      if (session && P002Api.isAdmin(session.user)) {
+        currentUser = session.user;
+        showApp();
+      }
+    } catch(e) {
+      console.error('Init error:', e);
+    }
   }
 
-  .sessions-list {
-    position: fixed;
-    left: -100%;
-    top: 48px;
-    bottom: 0;
-    z-index: 100;
-    width: 80vw;
-    max-width: 300px;
-    transition: left 0.25s ease;
-    box-shadow: 4px 0 20px rgba(0,0,0,0.5);
-    background: var(--bg);
-  }
-  .sessions-list.open { left: 0; }
-
-  .test-sidebar {
-    position: fixed;
-    left: -100%;
-    top: 48px;
-    bottom: 0;
-    z-index: 100;
-    width: 80vw;
-    max-width: 300px;
-    transition: left 0.25s ease;
-    box-shadow: 4px 0 20px rgba(0,0,0,0.5);
-  }
-  .test-sidebar.open { left: 0; }
-
-  .rules-sidebar {
-    position: fixed;
-    left: -100%;
-    top: 48px;
-    bottom: 0;
-    z-index: 100;
-    width: 80vw;
-    max-width: 300px;
-    transition: left 0.25s ease;
-    box-shadow: 4px 0 20px rgba(0,0,0,0.5);
-  }
-  .rules-sidebar.open { left: 0; }
-
-  .mobile-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.5);
-    z-index: 99;
-    top: 48px;
-  }
-  .mobile-overlay.open { display: block; }
-
-  .editor-btn { font-size: 10px; padding: 3px 8px; }
-  .editor-topbar { gap: 6px; overflow-x: auto; }
-}
-
-.fb-toggle { display: none; }
-
-/* ===== MOBILE BOTTOM NAV ===== */
-@media (max-width: 768px) {
-  .topbar-nav { display: none; }
-
-  .mobile-bottom-nav {
-    display: flex;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 56px;
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    z-index: 200;
-    padding-bottom: env(safe-area-inset-bottom);
+  function showApp() {
+    document.getElementById('authScreen').style.display = 'none';
+    const app = document.getElementById('appShell');
+    app.style.display = 'flex';
+    app.style.flex = '1';
+    app.style.minHeight = '0';
+    switchPanel('lessons');
   }
 
-  .mobile-bottom-nav-btn {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    color: var(--text-muted);
-    transition: color 0.15s;
-    padding: 6px 0;
-    font-size: 10px;
-    font-family: 'JetBrains Mono', monospace;
-    letter-spacing: 0.5px;
+  // ==================== AUTH ====================
+  async function doLogin() {
+    const email = P002Security.sanitizeInput(document.getElementById('authEmail').value.trim());
+    const password = document.getElementById('authPassword').value;
+    const btn = document.getElementById('authBtn');
+    const err = document.getElementById('authError');
+
+    err.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'Authenticating...';
+
+    try {
+      const user = await P002Api.signIn(email, password);
+      if (!P002Api.isAdmin(user)) throw new Error('Not authorized as admin');
+      currentUser = user;
+      showApp();
+    } catch(e) {
+      err.textContent = e.message;
+      err.style.display = 'block';
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Access Admin';
   }
 
-  .mobile-bottom-nav-btn .nav-icon { font-size: 18px; line-height: 1; }
-  .mobile-bottom-nav-btn.active { color: var(--accent); }
-  .mobile-bottom-nav-btn:hover { color: var(--text); }
+  async function doLogout() {
+    await P002Api.signOut();
+    location.reload();
+  }
 
-  /* Push main content above bottom nav */
-  .main { padding-bottom: 56px; }
+  // ==================== PANEL SWITCHING ====================
+  function switchPanel(name) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.topbar-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.mobile-bottom-nav-btn').forEach(b => b.classList.remove('active'));
+    const panelId = 'panel' + name.charAt(0).toUpperCase() + name.slice(1);
+    const navId = 'nav' + name.charAt(0).toUpperCase() + name.slice(1);
+    const mnavId = 'mnav' + name.charAt(0).toUpperCase() + name.slice(1);
+    document.getElementById(panelId)?.classList.add('active');
+    document.getElementById(navId)?.classList.add('active');
+    document.getElementById(mnavId)?.classList.add('active');
+    closeSidebar();
 
-  /* Topbar adjustments */
-  .topbar { padding: 0 12px; }
-  .topbar-logo { font-size: 14px; letter-spacing: 2px; }
-  .topbar-badge { display: none; }
-  .topbar-action-btn { font-size: 9px; padding: 3px 8px; }
-  .connDot-wrap { display: none; }
-}
+    switch(name) {
+      case 'lessons': loadFiles(); break;
+      case 'sessions': loadSessions(); break;
+      case 'users': loadUsers(); break;
+      case 'stats': loadStats(); break;
+      case 'rules': loadRule(currentRule, null); break;
+    }
+  }
 
-@media (min-width: 769px) {
-  .mobile-bottom-nav { display: none; }
-}
+  // ==================== MOBILE SIDEBAR ====================
+  function toggleSidebar() {
+    const activePanel = document.querySelector('.panel.active');
+    if (!activePanel) return;
+    const sidebar = activePanel.querySelector('.file-browser, .sessions-list, .test-sidebar, .rules-sidebar');
+    const overlay = document.getElementById('mobileOverlay');
+    if (!sidebar) return;
+    const isOpen = sidebar.classList.contains('open');
+    if (isOpen) {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('open');
+    } else {
+      sidebar.classList.add('open');
+      overlay.classList.add('open');
+    }
+  }
 
-/* ===== SCROLLBARS ===== */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+  function closeSidebar() {
+    document.querySelectorAll('.file-browser, .sessions-list, .test-sidebar, .rules-sidebar')
+      .forEach(s => s.classList.remove('open'));
+    document.getElementById('mobileOverlay')?.classList.remove('open');
+  }
 
-/* ===== TOAST ===== */
-.toast {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 10px 18px;
-  border-radius: 6px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  z-index: 9999;
-  animation: toastIn 0.25s ease;
-}
-@keyframes toastIn { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
-</style>
-</head>
-<body>
+  // ==================== FILE BROWSER ====================
+  async function loadFiles() {
+    const tree = document.getElementById('fileTree');
+    tree.innerHTML = '<div class="loading">Loading...</div>';
 
-<!-- Auth Screen -->
-<div id="authScreen" style="display:flex;flex:1;align-items:center;justify-content:center;">
-  <div class="auth-box">
-    <div class="auth-logo">PROJECT 002</div>
-    <div class="auth-sub">Admin Dashboard</div>
-    <div class="form-field" style="display:flex;flex-direction:column;gap:8px;">
-      <label style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;">Email</label>
-      <input class="modal-input" type="email" id="authEmail" placeholder="admin@example.com"/>
-    </div>
-    <div class="form-field" style="display:flex;flex-direction:column;gap:8px;">
-      <label style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;">Password</label>
-      <input class="modal-input" type="password" id="authPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')P002Admin.doLogin()"/>
-    </div>
-    <div class="auth-error" id="authError"></div>
-    <button class="auth-btn" id="authBtn" onclick="P002Admin.doLogin()">Access Admin</button>
-  </div>
-</div>
+    try {
+      const data = await P002Api.listBucket('');
+      tree.innerHTML = '';
 
-<!-- Main App (hidden until auth) -->
-<div id="appShell" style="display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0;">
+      const folders = data.filter(f => !f.metadata);
+      for (const folder of folders) {
+        const folderEl = await buildFolderEl(folder.name);
+        tree.appendChild(folderEl);
+      }
 
-  <!-- Top Bar -->
-  <div class="topbar">
-    <button class="fb-toggle" onclick="P002Admin.toggleSidebar()" style="background:transparent;border:1px solid var(--border2);color:var(--text-dim);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:16px;margin-right:4px;">☰</button>
-    <div class="topbar-logo">P002</div>
-    <div class="topbar-badge">ADMIN</div>
-    <div class="topbar-nav">
-      <button class="topbar-btn active" onclick="P002Admin.switchPanel('lessons')" id="navLessons">📁 Lessons</button>
-      <button class="topbar-btn" onclick="P002Admin.switchPanel('rules')" id="navRules">🧠 AI Rules</button>
-      <button class="topbar-btn" onclick="P002Admin.switchPanel('test')" id="navTest">🧪 Test Mode</button>
-      <button class="topbar-btn" onclick="P002Admin.switchPanel('sessions')" id="navSessions">💬 Sessions</button>
-      <button class="topbar-btn" onclick="P002Admin.switchPanel('users')" id="navUsers">👤 Users</button>
-      <button class="topbar-btn" onclick="P002Admin.switchPanel('stats')" id="navStats">📊 Stats</button>
-    </div>
-    <div class="topbar-right">
-      <div class="topbar-status">
-        <div class="status-dot ok" id="connDot"></div>
-        <span id="connLabel">connected</span>
-      </div>
-      <button class="topbar-action-btn" onclick="P002Admin.doLogout()">↩ Logout</button>
-    </div>
-  </div>
+      const rootFiles = data.filter(f => f.metadata);
+      rootFiles.forEach(f => tree.appendChild(buildFileEl(f, '')));
 
-  <!-- Main Content -->
-  <div class="main">
+    } catch(e) {
+      tree.innerHTML = `<div style="padding:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--danger);">Error: ${P002Security.escapeHtml(e.message)}</div>`;
+    }
+  }
 
-    <!-- LESSONS PANEL -->
-    <div class="panel active" id="panelLessons">
-      <div class="file-browser">
-        <div class="fb-header">
-          <div class="fb-title">Storage</div>
-          <div class="fb-actions">
-            <button class="fb-btn" onclick="P002Admin.refreshFiles()" title="Refresh">↻</button>
-            <button class="fb-btn" onclick="P002Admin.showNewFileModal()" title="New file">+</button>
-            <button class="fb-btn" onclick="P002Admin.showZipModal()" title="Upload ZIP">📦</button>
-            <button class="fb-btn fb-toggle" onclick="P002Admin.toggleSidebar()" title="Close">✕</button>
+  async function buildFolderEl(folderName) {
+    const folder = document.createElement('div');
+    folder.className = 'fb-folder';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'fb-folder-name open';
+    nameEl.innerHTML = `<span class="fb-arrow">▶</span> 📁 ${P002Security.escapeHtml(folderName)}`;
+
+    const filesEl = document.createElement('div');
+    filesEl.className = 'fb-files';
+
+    nameEl.onclick = () => {
+      nameEl.classList.toggle('open');
+      filesEl.style.display = nameEl.classList.contains('open') ? 'block' : 'none';
+    };
+
+    folder.appendChild(nameEl);
+    folder.appendChild(filesEl);
+
+    try {
+      const data = await P002Api.listBucket(folderName);
+      data.forEach(f => filesEl.appendChild(buildFileEl(f, folderName)));
+    } catch(e) {}
+
+    return folder;
+  }
+
+  function buildFileEl(file, folder) {
+    const path = folder ? `${folder}/${file.name}` : file.name;
+    const el = document.createElement('div');
+    el.className = 'fb-file';
+    el.dataset.path = path;
+
+    const isJson = file.name.endsWith('.json');
+    el.innerHTML = `
+      <span class="fb-file-icon">${isJson ? '{ }' : '📄'}</span>
+      <span style="flex:1">${P002Security.escapeHtml(file.name)}</span>
+      <div class="fb-file-actions">
+        <span class="fb-file-action" onclick="event.stopPropagation();P002Admin.deleteFile('${P002Security.escapeHtml(path)}')">✕</span>
+      </div>`;
+
+    el.onclick = () => { openFile(path, el); closeSidebar(); };
+    return el;
+  }
+
+  async function openFile(path, el) {
+    if (editorDirty && !confirm('Discard unsaved changes?')) return;
+
+    // Validate path
+    const safePath = P002Security.sanitizePath(path);
+    if (!safePath) { toast('Invalid file path', 'err'); return; }
+
+    document.querySelectorAll('.fb-file').forEach(f => f.classList.remove('active'));
+    if (el) el.classList.add('active');
+
+    currentFile = safePath;
+    editorDirty = false;
+
+    const textarea = document.getElementById('editorTextarea');
+    const empty = document.getElementById('editorEmpty');
+    const statusbar = document.getElementById('editorStatusbar');
+
+    textarea.value = 'Loading...';
+    textarea.style.display = 'block';
+    empty.style.display = 'none';
+    statusbar.style.display = 'flex';
+
+    document.getElementById('editorFilename').textContent = safePath;
+    document.getElementById('editorFilename').className = 'editor-filename';
+    document.getElementById('btnValidate').style.display = '';
+    document.getElementById('btnFormat').style.display = '';
+    document.getElementById('btnSave').style.display = '';
+    document.getElementById('editorValidateStatus').style.display = 'none';
+    document.getElementById('editorPath').textContent = safePath;
+
+    try {
+      const data = await P002Api.adminGetFile(safePath);
+      try {
+        textarea.value = JSON.stringify(JSON.parse(data.content), null, 2);
+      } catch {
+        textarea.value = data.content;
+      }
+      updateEditorStatus();
+    } catch(e) {
+      textarea.value = `Error loading file: ${e.message}`;
+    }
+  }
+
+  function onEditorChange() {
+    editorDirty = true;
+    document.getElementById('editorFilename').className = 'editor-filename dirty';
+    updateEditorStatus();
+    document.getElementById('editorValidateStatus').style.display = 'none';
+  }
+
+  function updateEditorStatus() {
+    const text = document.getElementById('editorTextarea').value;
+    const lines = text.split('\n').length;
+    const size = (new Blob([text]).size / 1024).toFixed(1);
+    document.getElementById('editorLines').textContent = `${lines} lines`;
+    document.getElementById('editorSize').textContent = `${size} KB`;
+  }
+
+  function validateEditor() {
+    const text = document.getElementById('editorTextarea').value;
+    const status = document.getElementById('editorValidateStatus');
+    status.style.display = '';
+
+    const result = P002Security.validateLessonJson(text);
+    if (result.ok) {
+      status.textContent = '✓ Valid JSON -- schema OK';
+      status.className = 'editor-validate-status ok';
+    } else {
+      status.textContent = '✗ ' + result.errors[0];
+      status.className = 'editor-validate-status err';
+    }
+  }
+
+  function formatEditor() {
+    const textarea = document.getElementById('editorTextarea');
+    const parsed = P002Security.safeParseJson(textarea.value);
+    if (!parsed.ok) { toast('Invalid JSON -- cannot format', 'err'); return; }
+    textarea.value = JSON.stringify(parsed.data, null, 2);
+    editorDirty = true;
+    updateEditorStatus();
+    toast('Formatted', 'ok');
+  }
+
+  function handleEditorKey(e) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = e.target.selectionStart;
+      const end = e.target.selectionEnd;
+      e.target.value = e.target.value.substring(0, start) + '  ' + e.target.value.substring(end);
+      e.target.selectionStart = e.target.selectionEnd = start + 2;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      saveEditor();
+    }
+  }
+
+  async function saveEditor() {
+    if (!currentFile) return;
+    const text = document.getElementById('editorTextarea').value;
+
+    // Full validation before save
+    const validation = P002Security.validateLessonJson(text);
+    if (!validation.ok) {
+      toast('Cannot save -- ' + validation.errors[0], 'err');
+      return;
+    }
+
+    const btn = document.getElementById('btnSave');
+    btn.textContent = 'Saving...';
+    btn.disabled = true;
+
+    try {
+      await P002Api.adminSaveFile(currentFile, JSON.stringify(validation.data, null, 2));
+      editorDirty = false;
+      document.getElementById('editorFilename').className = 'editor-filename';
+      document.getElementById('editorFilename').textContent = currentFile;
+      toast('Saved: ' + currentFile, 'ok');
+    } catch(e) {
+      toast('Save failed: ' + e.message, 'err');
+    }
+
+    btn.textContent = '💾 Save';
+    btn.disabled = false;
+  }
+
+  async function deleteFile(path) {
+    const safePath = P002Security.sanitizePath(path);
+    if (!safePath) { toast('Invalid path', 'err'); return; }
+    if (!confirm(`Delete ${safePath}? This cannot be undone.`)) return;
+
+    try {
+      const sb = P002Api.getClient();
+      const { error } = await sb.storage.from(P002Api.BUCKET).remove([safePath]);
+      if (error) throw error;
+      toast('Deleted: ' + safePath, 'ok');
+      if (currentFile === safePath) resetEditor();
+      loadFiles();
+    } catch(e) {
+      toast('Delete failed: ' + e.message, 'err');
+    }
+  }
+
+  function resetEditor() {
+    currentFile = null;
+    editorDirty = false;
+    document.getElementById('editorTextarea').style.display = 'none';
+    document.getElementById('editorEmpty').style.display = 'flex';
+    document.getElementById('editorStatusbar').style.display = 'none';
+    document.getElementById('editorFilename').textContent = 'No file selected';
+    document.getElementById('btnValidate').style.display = 'none';
+    document.getElementById('btnFormat').style.display = 'none';
+    document.getElementById('btnSave').style.display = 'none';
+  }
+
+  function refreshFiles() { loadFiles(); }
+
+  // ==================== NEW FILE ====================
+  function showNewFileModal() { document.getElementById('newFileModal').style.display = 'flex'; }
+
+  async function createNewFile() {
+    const rawName = document.getElementById('newFileName').value.trim();
+    const rawFolder = document.getElementById('newFileFolder').value.trim();
+    if (!rawName) return;
+
+    const name = P002Security.sanitizeFilename(rawName);
+    const path = P002Security.sanitizePath(`${rawFolder}/${name}`);
+    if (!path) { toast('Invalid file path', 'err'); return; }
+
+    const template = {
+      system_prompt: 'You are a cybersecurity instructor teaching hands-on penetration testing skills.',
+      lesson: {
+        title: 'New Section',
+        module: 'Introduction to Web Applications',
+        section: 0,
+        total_sections: 17,
+        difficulty: 'beginner',
+        prerequisites: [],
+        has_practice_box: false,
+        estimated_read_minutes: 10,
+        practice_question: null,
+        practice_flag: null
+      },
+      simulation: null,
+      teaching_path: [{
+        id: '1',
+        type: 'knowledge_probe',
+        phase: 'entry',
+        prompt: 'What do you already know about this topic?',
+        purpose: 'Calibrate starting point.'
+      }],
+      teaching_rules: {
+        never_do: ['Give direct answers before the learner attempts'],
+        always_do: ['Probe existing knowledge before teaching'],
+        pacing: 'If overwhelmed -- switch to direct delivery. If breezing through -- increase depth.'
+      },
+      datasets: {},
+      session_summary: {
+        description: 'Populated by AI at lesson completion.',
+        concepts_mastered: [],
+        struggled_with: [],
+        flag_captured: false
+      },
+      metadata: { source: 'Manual', version: '1.0' }
+    };
+
+    try {
+      await P002Api.adminSaveFile(path, JSON.stringify(template, null, 2));
+      toast('Created: ' + path, 'ok');
+      closeModal('newFileModal');
+      loadFiles();
+      setTimeout(() => openFile(path, null), 500);
+    } catch(e) {
+      toast('Create failed: ' + e.message, 'err');
+    }
+  }
+
+  // ==================== ZIP UPLOAD ====================
+  function showZipModal() { document.getElementById('zipModal').style.display = 'flex'; }
+
+  async function handleZipUpload() {
+    const fileInput = document.getElementById('zipFileInput');
+    const file = fileInput.files[0];
+    if (!file) { toast('Select a ZIP file first', 'err'); return; }
+    if (!file.name.endsWith('.zip')) { toast('File must be a .zip', 'err'); return; }
+
+    const output = document.getElementById('zipOutput');
+    const btn = document.getElementById('btnUploadZip');
+    output.innerHTML = '<div style="color:var(--info)">Processing ZIP...</div>';
+    btn.disabled = true;
+    btn.textContent = 'Processing...';
+
+    try {
+      const result = await P002Security.processLessonZip(file);
+
+      if (!result.ok) {
+        output.innerHTML = `<div style="color:var(--red)">✗ ${P002Security.escapeHtml(result.error)}</div>`;
+        return;
+      }
+
+      const { results } = result;
+      let html = '';
+      let uploadCount = 0;
+      let failCount = 0;
+
+      for (const r of results) {
+        if (r.ok) {
+          html += `<div style="color:var(--green)">⟳ Uploading ${P002Security.escapeHtml(r.path)}...</div>`;
+          output.innerHTML = html;
+          try {
+            await P002Api.adminSaveFile(r.path, r.content);
+            html = html.replace(`⟳ Uploading ${P002Security.escapeHtml(r.path)}...`, `✓ ${P002Security.escapeHtml(r.path)}`);
+            uploadCount++;
+          } catch(e) {
+            html = html.replace(`⟳ Uploading ${P002Security.escapeHtml(r.path)}...`, `✗ ${P002Security.escapeHtml(r.path)} -- Upload failed: ${P002Security.escapeHtml(e.message)}`);
+            failCount++;
+          }
+        } else {
+          html += `<div style="color:var(--red)">✗ ${P002Security.escapeHtml(r.filename)} -- ${P002Security.escapeHtml(r.errors.join(', '))}</div>`;
+          failCount++;
+        }
+        output.innerHTML = html;
+      }
+
+      html += `<div style="margin-top:12px;color:var(--info)">Done: ${uploadCount} uploaded, ${failCount} failed</div>`;
+      output.innerHTML = html;
+
+      if (uploadCount > 0) {
+        toast(`${uploadCount} file(s) uploaded`, 'ok');
+        loadFiles();
+      }
+
+    } catch(e) {
+      output.innerHTML = `<div style="color:var(--red)">Error: ${P002Security.escapeHtml(e.message)}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '▶ Upload & Extract';
+      fileInput.value = '';
+    }
+  }
+
+  // ==================== AI RULES ====================
+  async function loadRule(ruleKey, el) {
+    if (el) {
+      document.querySelectorAll('.rules-item').forEach(i => i.classList.remove('active'));
+      el.classList.add('active');
+    }
+    currentRule = ruleKey;
+
+    const textarea = document.getElementById('rulesTextarea');
+    const filename = document.getElementById('rulesFilename');
+    filename.textContent = ruleKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+    if (['system_prompt', 'teaching_balance', 'confidentiality', 'sequencing'].includes(ruleKey)) {
+      textarea.value = 'Loading...';
+      try {
+        const data = await P002Api.adminGetFile('module_intro_web_apps/section_09.json');
+        const parsed = P002Security.safeParseJson(data.content);
+        if (!parsed.ok) throw new Error('Invalid JSON in section_09');
+        const json = parsed.data;
+        const sp = json.system_prompt || '';
+
+        if (ruleKey === 'system_prompt') {
+          textarea.value = sp;
+        } else if (ruleKey === 'teaching_balance') {
+          const start = sp.indexOf('TEACHING BALANCE');
+          textarea.value = start !== -1 ? sp.substring(start) : 'Teaching balance rules not found.';
+        } else if (ruleKey === 'confidentiality') {
+          const start = sp.indexOf('CONFIDENTIALITY');
+          const end = sp.indexOf('\n\nTEACHING VARIETY', start);
+          textarea.value = start !== -1 ? sp.substring(start, end !== -1 ? end : undefined) : 'Confidentiality rules not found.';
+        } else if (ruleKey === 'sequencing') {
+          const start = sp.indexOf('CRITICAL SEQUENCING');
+          const end = sp.indexOf('\n\nTEACHING BALANCE', start);
+          textarea.value = start !== -1 ? sp.substring(start, end !== -1 ? end : undefined) : 'Sequencing rules not found.';
+        }
+      } catch(e) {
+        textarea.value = 'Error loading: ' + e.message;
+      }
+    } else {
+      textarea.value = `// Edit ${ruleKey} in the Lessons tab by opening the section JSON file.`;
+    }
+  }
+
+  async function saveRule() {
+    toast('Edit rules directly in the JSON editor (Lessons tab)', 'warn');
+  }
+
+  // ==================== TEST MODE ====================
+  function selectTest(testKey, el) {
+    document.querySelectorAll('.test-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+    currentTest = testKey;
+    const titles = {
+      lesson: 'Lesson Flow Test',
+      flag: 'Flag Validator',
+      sim: 'Sim UI Test',
+      cli: 'CLI Command Test',
+      json: 'JSON Validator -- All Sections'
+    };
+    document.getElementById('testTitle').textContent = titles[testKey];
+    document.getElementById('testOutput').textContent = 'Run a test to see output...';
+    document.getElementById('testOutput').className = 'test-output';
+  }
+
+  async function runTest() {
+    const output = document.getElementById('testOutput');
+    const section = document.getElementById('testSection')?.value;
+    const input = P002Security.sanitizeInput(document.getElementById('testInput')?.value || '');
+    output.textContent = 'Running...';
+    output.className = 'test-output';
+
+    try {
+      switch(currentTest) {
+        case 'flag': await runFlagTest(input, section, output); break;
+        case 'json': await runJsonValidation(output); break;
+        case 'lesson': await runLessonTest(section, input, output); break;
+        case 'sim': runSimTest(output); break;
+        case 'cli': await runCliTest(input, output); break;
+      }
+    } catch(e) {
+      output.innerHTML = `<span class="test-result-fail">ERROR: ${P002Security.escapeHtml(e.message)}</span>`;
+    }
+  }
+
+  async function runFlagTest(input, section, output) {
+    if (!section) { output.textContent = 'Select a section first'; return; }
+    const data = await P002Api.adminGetFile(`module_intro_web_apps/${section}`);
+    const parsed = P002Security.safeParseJson(data.content);
+    if (!parsed.ok) { output.textContent = 'Invalid JSON in section file'; return; }
+    const flag = parsed.data.lesson?.practice_flag || parsed.data.simulation?.flag;
+    if (!flag) { output.innerHTML = `<span class="test-result-info">ℹ No flag defined for this section</span>`; return; }
+    const match = input.trim().toLowerCase() === flag.toLowerCase();
+    output.innerHTML =
+      `<span class="test-result-info">Expected: ${P002Security.escapeHtml(flag)}</span>\n` +
+      `<span class="test-result-info">Submitted: ${P002Security.escapeHtml(input || '(empty)')}</span>\n` +
+      (match ? `<span class="test-result-pass">✓ PASS</span>` : `<span class="test-result-fail">✗ FAIL</span>`);
+  }
+
+  async function runJsonValidation(output) {
+    output.textContent = 'Validating all sections...\n';
+    const sections = Array.from({length: 17}, (_, i) => `section_${String(i+1).padStart(2,'0')}`);
+    let results = '';
+    let passed = 0;
+    let failed = 0;
+
+    for (const s of sections) {
+      try {
+        const data = await P002Api.adminGetFile(`module_intro_web_apps/${s}.json`);
+        const validation = P002Security.validateLessonJson(data.content);
+        if (validation.ok) {
+          results += `<span class="test-result-pass">✓ ${s}.json -- valid</span>\n`;
+          passed++;
+        } else {
+          results += `<span class="test-result-fail">✗ ${s}.json -- ${P002Security.escapeHtml(validation.errors[0])}</span>\n`;
+          failed++;
+        }
+      } catch(e) {
+        results += `<span class="test-result-fail">✗ ${s}.json -- ${P002Security.escapeHtml(e.message)}</span>\n`;
+        failed++;
+      }
+      output.innerHTML = results;
+    }
+
+    results += `\n<span class="test-result-info">Result: ${passed} passed, ${failed} failed</span>`;
+    output.innerHTML = results;
+  }
+
+  async function runLessonTest(section, input, output) {
+    if (!section) { output.textContent = 'Select a section first'; return; }
+    if (!input) { output.textContent = 'Enter a test message'; return; }
+    output.textContent = 'Calling Claude...';
+
+    const data = await P002Api.adminGetFile(`module_intro_web_apps/${section}`);
+    const parsed = P002Security.safeParseJson(data.content);
+    if (!parsed.ok) { output.textContent = 'Invalid JSON'; return; }
+    const json = parsed.data;
+    const node = json.teaching_path?.[0];
+    const sp = `${json.system_prompt}\n\nCURRENT NODE:\n${JSON.stringify(node, null, 2)}\n\nTEACHING RULES:\n${JSON.stringify(json.teaching_rules, null, 2)}`;
+
+    const reply = await P002Api.callClaude(sp, [{ role: 'user', content: input }]);
+    output.innerHTML = `<span class="test-result-info">// Input: ${P002Security.escapeHtml(input)}</span>\n\n<span class="test-result-pass">// AI Response:</span>\n${P002Security.escapeHtml(reply)}`;
+  }
+
+  function runSimTest(output) {
+    output.innerHTML = `<span class="test-result-info">Open the teaching app and start a XSS session to test the sim environment.</span>`;
+  }
+
+  async function runCliTest(input, output) {
+    if (!input) { output.textContent = 'Enter a CLI command to test'; return; }
+    output.textContent = 'Simulating...';
+    const reply = await P002Api.callClaude(
+      'You are a terminal simulator for a cybersecurity teaching platform. Simulate realistic terminal output for penetration testing commands.',
+      [{ role: 'user', content: `Simulate: ${input}` }]
+    );
+    output.textContent = reply;
+  }
+
+  // ==================== SESSIONS ====================
+  async function loadSessions() {
+    const list = document.getElementById('sessionsList');
+    list.innerHTML = '<div class="loading">Loading...</div>';
+
+    try {
+      const data = await P002Api.adminGetSessions(100);
+      list.innerHTML = '';
+
+      if (!data.sessions.length) {
+        list.innerHTML = '<div class="loading">No sessions found</div>';
+        return;
+      }
+
+      data.sessions.forEach(s => {
+        const el = document.createElement('div');
+        el.className = 'session-item';
+        el.dataset.id = s.id;
+        el.innerHTML = `
+          <div class="session-item-top">
+            <div class="session-item-id">${P002Security.escapeHtml(s.id.slice(0,12))}...</div>
+            <div class="session-item-status ${s.completed_at ? 'complete' : 'active'}">${s.completed_at ? 'done' : 'active'}</div>
           </div>
-        </div>
-        <div class="fb-tree" id="fileTree">
-          <div class="loading">Loading...</div>
-        </div>
-      </div>
-      <div class="editor-area">
-        <div class="editor-topbar" id="editorTopbar">
-          <div class="editor-filename" id="editorFilename">No file selected</div>
-          <div id="editorValidateStatus" class="editor-validate-status" style="display:none"></div>
-          <button class="editor-btn" onclick="P002Admin.validateEditor()" id="btnValidate" style="display:none">✓ Validate</button>
-          <button class="editor-btn" onclick="P002Admin.formatEditor()" id="btnFormat" style="display:none">⟳ Format</button>
-          <button class="editor-btn primary" onclick="P002Admin.saveEditor()" id="btnSave" style="display:none">💾 Save</button>
-        </div>
-        <div id="editorEmpty" class="editor-empty">
-          <div class="editor-empty-icon">📄</div>
-          <div class="editor-empty-text">Select a file to edit</div>
-        </div>
-        <textarea class="editor-textarea" id="editorTextarea" style="display:none" 
-          oninput="P002Admin.onEditorChange()" 
-          onkeydown="P002Admin.handleEditorKey(event)"
-          spellcheck="false"></textarea>
-        <div class="editor-statusbar" id="editorStatusbar" style="display:none">
-          <span class="editor-status-item" id="editorLines">0 lines</span>
-          <span class="editor-status-item" id="editorSize">0 KB</span>
-          <span class="editor-status-item" id="editorPath"></span>
-        </div>
-      </div>
-    </div>
+          <div class="session-item-meta">
+            <span>§${s.section_number || '?'}</span>
+            <span>${s.flag_captured ? '🏴' : ''}</span>
+            <span>${new Date(s.started_at).toLocaleDateString()}</span>
+          </div>`;
+        el.onclick = () => { viewSession(s, el); closeSidebar(); };
+        list.appendChild(el);
+      });
+    } catch(e) {
+      list.innerHTML = `<div style="padding:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--danger);">Error: ${P002Security.escapeHtml(e.message)}</div>`;
+    }
+  }
 
-    <!-- AI RULES PANEL -->
-    <div class="panel" id="panelRules">
-      <div class="rules-sidebar">
-        <div class="rules-sidebar-section">
-          <div class="rules-sidebar-label">Global</div>
-          <div class="rules-item active" onclick="P002Admin.loadRule('system_prompt', this)">System Prompt</div>
-          <div class="rules-item" onclick="P002Admin.loadRule('teaching_balance', this)">Teaching Balance</div>
-          <div class="rules-item" onclick="P002Admin.loadRule('confidentiality', this)">Confidentiality</div>
-          <div class="rules-item" onclick="P002Admin.loadRule('sequencing', this)">Sequencing Rules</div>
-        </div>
-        <div class="rules-sidebar-section">
-          <div class="rules-sidebar-label">Per Lesson</div>
-          <div class="rules-item" onclick="P002Admin.loadRule('lesson_rules', this)">Lesson Rules</div>
-          <div class="rules-item" onclick="P002Admin.loadRule('memory_anchors', this)">Memory Anchors</div>
-          <div class="rules-item" onclick="P002Admin.loadRule('datasets', this)">Datasets</div>
-        </div>
-      </div>
-      <div class="rules-content">
-        <div class="editor-topbar">
-          <div class="editor-filename" id="rulesFilename">System Prompt</div>
-          <button class="editor-btn" onclick="P002Admin.saveRule()" id="btnSaveRule">💾 Save Rule</button>
-        </div>
-        <textarea class="editor-textarea" id="rulesTextarea" spellcheck="false" 
-          placeholder="Select a rule to edit..." style="flex:1"></textarea>
-        <div class="editor-statusbar">
-          <span class="editor-status-item">Changes apply to next session</span>
-        </div>
-      </div>
-    </div>
+  async function viewSession(session, el) {
+    document.querySelectorAll('.session-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+    currentSession = session;
 
-    <!-- TEST MODE PANEL -->
-    <div class="panel" id="panelTest">
-      <div class="test-sidebar">
-        <div class="test-sidebar-title">Test Suites</div>
-        <div class="test-item active" onclick="P002Admin.selectTest('lesson', this)">
-          <div class="test-item-icon">🎓</div>
-          <div class="test-item-info">
-            <div class="test-item-name">Lesson Flow</div>
-            <div class="test-item-desc">Test teaching path</div>
-          </div>
-        </div>
-        <div class="test-item" onclick="P002Admin.selectTest('flag', this)">
-          <div class="test-item-icon">🏴</div>
-          <div class="test-item-info">
-            <div class="test-item-name">Flag Validator</div>
-            <div class="test-item-desc">Test flag submission</div>
-          </div>
-        </div>
-        <div class="test-item" onclick="P002Admin.selectTest('sim', this)">
-          <div class="test-item-icon">🌐</div>
-          <div class="test-item-info">
-            <div class="test-item-name">Sim UI</div>
-            <div class="test-item-desc">Test practice environment</div>
-          </div>
-        </div>
-        <div class="test-item" onclick="P002Admin.selectTest('cli', this)">
-          <div class="test-item-icon">⌨</div>
-          <div class="test-item-info">
-            <div class="test-item-name">CLI Commands</div>
-            <div class="test-item-desc">Test terminal responses</div>
-          </div>
-        </div>
-        <div class="test-item" onclick="P002Admin.selectTest('json', this)">
-          <div class="test-item-icon">📋</div>
-          <div class="test-item-info">
-            <div class="test-item-name">JSON Validator</div>
-            <div class="test-item-desc">Validate all sections</div>
-          </div>
-        </div>
-      </div>
-      <div class="test-content">
-        <div class="test-header">
-          <div class="test-title" id="testTitle">Lesson Flow Test</div>
-          <button class="test-run-btn" onclick="P002Admin.runTest()">▶ Run Test</button>
-        </div>
-        <div class="test-body" id="testBody">
-          <div class="test-section">
-            <div class="test-section-title">Section to Test</div>
-            <select id="testSection" style="background:var(--code-bg);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;width:100%;">
-              <option value="">— Select section —</option>
-              <option value="section_01.json">01 — Introduction</option>
-              <option value="section_07.json">07 — Sensitive Data Exposure</option>
-              <option value="section_08.json">08 — HTML Injection</option>
-              <option value="section_09.json">09 — XSS</option>
-              <option value="section_10.json">10 — CSRF</option>
-            </select>
-          </div>
-          <div class="test-section">
-            <div class="test-section-title">Test Input</div>
-            <textarea class="test-input" id="testInput" placeholder="Enter test message or payload..."></textarea>
-          </div>
-          <div class="test-section">
-            <div class="test-section-title">Output</div>
-            <div class="test-output" id="testOutput">Run a test to see output...</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    document.getElementById('sessionDetailTitle').textContent = `Session ${session.id.slice(0,8)} -- §${session.section_number}`;
+    document.getElementById('btnDeleteSession').style.display = '';
 
-    <!-- SESSIONS PANEL -->
-    <div class="panel" id="panelSessions">
-      <div class="sessions-split">
-        <div class="sessions-list">
-          <div class="sessions-list-header">
-            <div class="sessions-list-title">Sessions</div>
-            <button class="fb-btn" onclick="P002Admin.loadSessions()">↻</button>
-          </div>
-          <div class="sessions-list-body" id="sessionsList">
-            <div class="loading">Loading...</div>
-          </div>
+    const msgs = document.getElementById('sessionMessages');
+    msgs.innerHTML = '<div class="loading">Loading messages...</div>';
+
+    try {
+      const data = await P002Api.adminGetSessionMessages(session.id);
+      msgs.innerHTML = '';
+
+      if (!data.messages.length) {
+        msgs.innerHTML = '<div class="loading">No messages</div>';
+        return;
+      }
+
+      data.messages.forEach(m => {
+        const el = document.createElement('div');
+        el.className = `session-msg ${m.role}`;
+        el.innerHTML = `<div class="session-msg-role">${m.role}</div>${P002Security.escapeHtml(m.content)}`;
+        msgs.appendChild(el);
+      });
+
+      msgs.scrollTop = msgs.scrollHeight;
+    } catch(e) {
+      msgs.innerHTML = `<div style="color:var(--danger);font-size:11px;font-family:'JetBrains Mono',monospace;">Error: ${P002Security.escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  async function deleteCurrentSession() {
+    if (!currentSession) return;
+    if (!confirm('Delete this session and all messages?')) return;
+
+    try {
+      await P002Api.adminDeleteSession(currentSession.id);
+      toast('Session deleted', 'ok');
+      currentSession = null;
+      document.getElementById('sessionDetailTitle').textContent = 'Select a session to view';
+      document.getElementById('btnDeleteSession').style.display = 'none';
+      document.getElementById('sessionMessages').innerHTML = '<div class="loading">Select a session</div>';
+      loadSessions();
+    } catch(e) {
+      toast('Delete failed: ' + e.message, 'err');
+    }
+  }
+
+  // ==================== USERS ====================
+  async function loadUsers() {
+    const table = document.getElementById('usersTable');
+    table.innerHTML = '<div class="loading">Loading...</div>';
+
+    try {
+      const data = await P002Api.adminGetUsers();
+      const cols = 'grid-template-columns: 2fr 1.5fr 80px 120px 120px 100px';
+
+      table.innerHTML = `
+        <div class="data-table-header" style="${cols}">
+          <span>Email</span><span>ID</span><span>Verified</span><span>Last Login</span><span>Created</span><span>Actions</span>
         </div>
-        <div class="session-detail" id="sessionDetail">
-          <div class="session-detail-header">
-            <div class="session-detail-title" id="sessionDetailTitle">Select a session to view</div>
-            <button class="editor-btn danger" id="btnDeleteSession" style="display:none" onclick="P002Admin.deleteCurrentSession()">🗑 Delete</button>
-          </div>
-          <div class="session-messages" id="sessionMessages">
-            <div class="loading">Select a session</div>
-          </div>
-        </div>
-      </div>
-    </div>
+        ${data.users.map(u => `
+          <div class="data-table-row" style="${cols}">
+            <span class="highlight">${P002Security.escapeHtml(u.email || '')}</span>
+            <span>${P002Security.escapeHtml(u.id.slice(0,8))}...</span>
+            <span class="${u.confirmed ? 'good' : 'bad'}">${u.confirmed ? '✓' : '✗'}</span>
+            <span>${u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString() : 'Never'}</span>
+            <span>${new Date(u.created_at).toLocaleDateString()}</span>
+            <div class="row-actions">
+              ${u.id !== P002Api.ADMIN_USER_ID
+                ? `<button class="row-btn danger" onclick="P002Admin.banUser('${P002Security.escapeHtml(u.id)}')">Ban</button>`
+                : `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent);">YOU</span>`
+              }
+            </div>
+          </div>`).join('')}`;
+    } catch(e) {
+      table.innerHTML = `<div style="padding:16px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--danger);">Error: ${P002Security.escapeHtml(e.message)}</div>`;
+    }
+  }
 
-    <!-- USERS PANEL -->
-    <div class="panel" id="panelUsers">
-      <div class="users-panel">
-        <div class="panel-header">
-          <div class="panel-title">Users</div>
-          <button class="panel-action-btn" onclick="P002Admin.showInviteModal()">+ Invite User</button>
-        </div>
-        <div class="data-table" id="usersTable">
-          <div class="loading">Loading...</div>
-        </div>
-      </div>
-    </div>
+  async function banUser(userId) {
+    if (!confirm('Ban this user?')) return;
+    try {
+      await P002Api.adminBanUser(userId, true);
+      toast('User banned', 'ok');
+      loadUsers();
+    } catch(e) {
+      toast('Error: ' + e.message, 'err');
+    }
+  }
 
-    <!-- STATS PANEL -->
-    <div class="panel" id="panelStats">
-      <div class="stats-panel">
-        <div class="panel-header">
-          <div class="panel-title">Platform Stats</div>
-          <button class="panel-action-btn" onclick="P002Admin.loadStats()">↻ Refresh</button>
-        </div>
-        <div class="stats-grid" id="statsGrid">
-          <div class="loading">Loading...</div>
-        </div>
-        <div>
-          <div class="test-section-title" style="margin-bottom:12px;">SQL Query</div>
-          <textarea class="test-input" id="sqlInput" placeholder="SELECT * FROM sessions LIMIT 10;" style="min-height:60px;margin-bottom:10px;"></textarea>
-          <button class="test-run-btn" onclick="P002Admin.runSql()" style="margin-bottom:12px;">▶ Run Query</button>
-          <div class="test-output" id="sqlOutput" style="display:none"></div>
-        </div>
-      </div>
-    </div>
+  function showInviteModal() { document.getElementById('inviteModal').style.display = 'flex'; }
 
-  </div>
-</div>
+  async function createUser() {
+    const email = P002Security.sanitizeInput(document.getElementById('inviteEmail').value.trim());
+    const password = document.getElementById('invitePassword').value;
+    if (!email || !password) { toast('Email and password required', 'err'); return; }
+    try {
+      await P002Api.adminCreateUser(email, password);
+      toast('User created: ' + email, 'ok');
+      closeModal('inviteModal');
+      loadUsers();
+    } catch(e) {
+      toast('Error: ' + e.message, 'err');
+    }
+  }
 
-<!-- New File Modal -->
-<div class="modal-overlay" id="newFileModal" style="display:none">
-  <div class="modal">
-    <div class="modal-title">New Section File</div>
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      <label style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;">Filename</label>
-      <input class="modal-input" id="newFileName" placeholder="section_18.json"/>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      <label style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;">Folder</label>
-      <input class="modal-input" id="newFileFolder" value="module_intro_web_apps"/>
-    </div>
-    <div class="modal-actions">
-      <button class="modal-btn" onclick="P002Admin.closeModal('newFileModal')">Cancel</button>
-      <button class="modal-btn primary" onclick="P002Admin.createNewFile()">Create</button>
-    </div>
-  </div>
-</div>
+  // ==================== STATS ====================
+  async function loadStats() {
+    const grid = document.getElementById('statsGrid');
+    grid.innerHTML = '<div class="loading">Loading...</div>';
+    try {
+      const data = await P002Api.adminGetStats();
+      grid.innerHTML = `
+        <div class="stat-card"><div class="stat-value">${data.total_sessions}</div><div class="stat-label">Total Sessions</div></div>
+        <div class="stat-card"><div class="stat-value">${data.completed_sessions}</div><div class="stat-label">Completed</div></div>
+        <div class="stat-card"><div class="stat-value">${data.flags_captured}</div><div class="stat-label">Flags Captured</div></div>
+        <div class="stat-card"><div class="stat-value">${data.total_messages}</div><div class="stat-label">Total Messages</div></div>
+        <div class="stat-card"><div class="stat-value">${data.user_messages}</div><div class="stat-label">User Messages</div></div>
+        <div class="stat-card"><div class="stat-value">${data.ai_messages}</div><div class="stat-label">AI Responses</div></div>`;
+    } catch(e) {
+      grid.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--danger);">Error: ${P002Security.escapeHtml(e.message)}</div>`;
+    }
+  }
 
-<!-- Invite User Modal -->
-<div class="modal-overlay" id="inviteModal" style="display:none">
-  <div class="modal">
-    <div class="modal-title">Invite User</div>
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      <label style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;">Email</label>
-      <input class="modal-input" id="inviteEmail" placeholder="user@example.com"/>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      <label style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;">Temporary Password</label>
-      <input class="modal-input" id="invitePassword" placeholder="temp-password-123"/>
-    </div>
-    <div class="modal-actions">
-      <button class="modal-btn" onclick="P002Admin.closeModal('inviteModal')">Cancel</button>
-      <button class="modal-btn primary" onclick="P002Admin.createUser()">Create Account</button>
-    </div>
-  </div>
-</div>
+  async function runSql() {
+    const input = P002Security.sanitizeInput(document.getElementById('sqlInput').value.trim());
+    const output = document.getElementById('sqlOutput');
+    if (!input) return;
+    output.style.display = 'block';
+    output.style.color = '';
+    output.textContent = 'Running...';
+    try {
+      const data = await P002Api.adminRunSql(input);
+      output.textContent = JSON.stringify(data.rows, null, 2);
+    } catch(e) {
+      output.style.color = 'var(--danger)';
+      output.textContent = 'Error: ' + e.message;
+    }
+  }
 
-<!-- Bottom Nav (mobile only) -->
-<div class="bottom-nav" id="bottomNav">
-  <button class="bottom-nav-btn active" id="bnLessons" onclick="P002Admin.switchPanel('lessons')">
-    <span class="bn-icon">📁</span>Files
-  </button>
-  <button class="bottom-nav-btn" id="bnRules" onclick="P002Admin.switchPanel('rules')">
-    <span class="bn-icon">🧠</span>Rules
-  </button>
-  <button class="bottom-nav-btn" id="bnTest" onclick="P002Admin.switchPanel('test')">
-    <span class="bn-icon">🧪</span>Test
-  </button>
-  <button class="bottom-nav-btn" id="bnSessions" onclick="P002Admin.switchPanel('sessions')">
-    <span class="bn-icon">💬</span>Sessions
-  </button>
-  <button class="bottom-nav-btn" id="bnUsers" onclick="P002Admin.switchPanel('users')">
-    <span class="bn-icon">👤</span>Users
-  </button>
-  <button class="bottom-nav-btn" id="bnStats" onclick="P002Admin.switchPanel('stats')">
-    <span class="bn-icon">📊</span>Stats
-  </button>
-</div>
+  // ==================== HELPERS ====================
+  function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-<!-- Mobile Bottom Nav -->
-<div class="mobile-bottom-nav">
-  <button class="mobile-bottom-nav-btn active" id="mnavLessons" onclick="P002Admin.switchPanel('lessons')">
-    <span class="nav-icon">📁</span>
-    <span>Lessons</span>
-  </button>
-  <button class="mobile-bottom-nav-btn" id="mnavRules" onclick="P002Admin.switchPanel('rules')">
-    <span class="nav-icon">🧠</span>
-    <span>Rules</span>
-  </button>
-  <button class="mobile-bottom-nav-btn" id="mnavTest" onclick="P002Admin.switchPanel('test')">
-    <span class="nav-icon">🧪</span>
-    <span>Test</span>
-  </button>
-  <button class="mobile-bottom-nav-btn" id="mnavSessions" onclick="P002Admin.switchPanel('sessions')">
-    <span class="nav-icon">💬</span>
-    <span>Sessions</span>
-  </button>
-  <button class="mobile-bottom-nav-btn" id="mnavUsers" onclick="P002Admin.switchPanel('users')">
-    <span class="nav-icon">👤</span>
-    <span>Users</span>
-  </button>
-  <button class="mobile-bottom-nav-btn" id="mnavStats" onclick="P002Admin.switchPanel('stats')">
-    <span class="nav-icon">📊</span>
-    <span>Stats</span>
-  </button>
-</div>
+  function toast(msg, type = 'ok') {
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.style.background = type === 'ok' ? 'var(--surface)' : type === 'err' ? 'var(--danger)' : 'var(--warn-dim)';
+    el.style.color = type === 'ok' ? 'var(--accent)' : type === 'err' ? '#fff' : 'var(--warn)';
+    el.style.border = `1px solid ${type === 'ok' ? 'var(--accent)' : type === 'err' ? 'var(--danger)' : 'var(--warn)'}`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  }
 
-<!-- Mobile overlay -->
-<div class="mobile-overlay" id="mobileOverlay" onclick="P002Admin.closeSidebar()"></div>
-<!-- ZIP Upload Modal -->
-<div class="modal-overlay" id="zipModal" style="display:none">
-  <div class="modal">
-    <div class="modal-title">Upload Lesson ZIP</div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);line-height:1.6;">
-      ZIP must contain .json files in <code>module_intro_web_apps/</code> folder.<br>
-      Each file will be validated before upload. Max 10MB.
-    </div>
-    <input type="file" id="zipFileInput" accept=".zip"
-      style="background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:10px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;width:100%;"/>
-    <div id="zipOutput" style="background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:11px;min-height:60px;white-space:pre-wrap;display:none;"></div>
-    <div class="modal-actions">
-      <button class="modal-btn" onclick="P002Admin.closeModal('zipModal')">Cancel</button>
-      <button class="modal-btn primary" id="btnUploadZip" onclick="P002Admin.handleZipUpload()">▶ Upload & Extract</button>
-    </div>
-  </div>
-</div>
+  // ==================== PUBLIC API ====================
+  return {
+    init,
+    doLogin,
+    doLogout,
+    switchPanel,
+    toggleSidebar,
+    closeSidebar,
+    loadFiles,
+    openFile,
+    onEditorChange,
+    validateEditor,
+    formatEditor,
+    handleEditorKey,
+    saveEditor,
+    deleteFile,
+    refreshFiles,
+    showNewFileModal,
+    createNewFile,
+    showZipModal,
+    handleZipUpload,
+    loadRule,
+    saveRule,
+    selectTest,
+    runTest,
+    loadSessions,
+    deleteCurrentSession,
+    loadUsers,
+    banUser,
+    showInviteModal,
+    createUser,
+    loadStats,
+    runSql,
+    closeModal,
+  };
 
+})();
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="security.js"></script>
-<script src="api.js"></script>
-<script src="admin.js"></script>
-</body>
-</html>
+// Boot
+window.addEventListener('load', P002Admin.init);
