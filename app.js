@@ -148,7 +148,8 @@ window.P002Admin = (() => {
     logGen('working', '⟳ Extracting pages ' + pageFrom + '–' + pageTo + '...');
     let chapters;
     try {
-      chapters = await extractPdfChapters(genPdfFile, pageFrom, pageTo);
+      const sectionsPerChapter = parseInt(document.getElementById('genSectionsPerChapter').value) || 3;
+      chapters = await extractPdfChapters(genPdfFile, pageFrom, pageTo, sectionsPerChapter);
       logGen('ok', '✓ Extracted — ' + chapters.length + ' sections detected');
     } catch(e) {
       logGen('err', '✗ PDF extraction failed: ' + e.message);
@@ -195,9 +196,10 @@ window.P002Admin = (() => {
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 
-  async function extractPdfChapters(file, pageFrom, pageTo) {
+  async function extractPdfChapters(file, pageFrom, pageTo, sectionsPerChapter) {
     pageFrom = pageFrom || 1;
     pageTo = pageTo || 9999;
+    sectionsPerChapter = sectionsPerChapter || 3;
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const numPages = pdf.numPages;
@@ -216,35 +218,44 @@ window.P002Admin = (() => {
     const chapterPattern = /Chapter\s+\d+|CHAPTER\s+\d+/gm;
     const matches = Array.from(fullText.matchAll(chapterPattern));
 
+    let rawChapters = [];
     if (matches.length >= 2) {
-      const chapters = [];
       for (let i = 0; i < matches.length; i++) {
         const s = matches[i].index;
         const e = i < matches.length - 1 ? matches[i+1].index : fullText.length;
         const text = fullText.slice(s, e).trim();
         if (text.length > 300) {
           const titleLine = text.split('\\n')[0].trim().slice(0, 80);
-          chapters.push({ title: titleLine, text: text.slice(0, 12000) });
+          rawChapters.push({ title: titleLine, text: text });
         }
       }
-      if (chapters.length > 0) return chapters.slice(0, 20);
     }
 
-    // Fallback: equal-size chunks capped at 20
-    const words = fullText.split(/\s+/).filter(function(w) { return w.length > 0; });
-    const numChunks = Math.min(20, Math.max(3, Math.floor(words.length / 600)));
-    const chunkSize = Math.ceil(words.length / numChunks);
-    const chapters = [];
-    for (let i = 0; i < words.length && chapters.length < 20; i += chunkSize) {
-      const chunk = words.slice(i, i + chunkSize).join(' ');
-      if (chunk.trim().length > 200) {
-        chapters.push({
-          title: 'Section ' + (chapters.length + 1),
-          text: chunk.slice(0, 12000)
-        });
-      }
+    if (rawChapters.length === 0) {
+      // Fallback: treat whole text as one chapter
+      rawChapters = [{ title: 'Content', text: fullText }];
     }
-    return chapters;
+
+    // Split each chapter into sectionsPerChapter sub-sections
+    const sections = [];
+    rawChapters.forEach(function(chapter, chIdx) {
+      const words = chapter.text.split(/\s+/).filter(function(w) { return w.length > 0; });
+      const subChunkSize = Math.ceil(words.length / sectionsPerChapter);
+      for (let s = 0; s < sectionsPerChapter; s++) {
+        const chunk = words.slice(s * subChunkSize, (s + 1) * subChunkSize).join(' ');
+        if (chunk.trim().length > 100) {
+          const partLabel = sectionsPerChapter > 1 ? ' (Part ' + (s+1) + ')' : '';
+          sections.push({
+            title: chapter.title + partLabel,
+            text: chunk.slice(0, 4000),
+            chapterNum: chIdx + 1,
+            partNum: s + 1
+          });
+        }
+      }
+    });
+
+    return sections.slice(0, 20);
   }
 
   async function generateSection(chapter, sectionNum, totalSections, moduleKey, moduleTitle, category, difficulty) {
@@ -282,29 +293,33 @@ OUTPUT SCHEMA:
   "ai_context": "2-3 sentence summary of what this section covers for the AI tutor"
 }
 
-Include 10-18 content blocks. Add a challenge if the section covers hands-on exploitable concepts.`;
+Include 10-16 content blocks. This may be one part of a larger chapter — focus only on the concepts in the provided content. Add a challenge only if the content covers something directly hands-on and exploitable.`;
 
     const userMsg = `Convert this chapter into a reader section. Chapter title: "${chapter.title}"\n\nContent:\n${chapter.text}`;
 
-    const response = await fetch('https://hmrnwvahkcoexjcxohel.supabase.co/functions/v1/claude-proxy', {
+    // Use direct fetch with correct headers — needs max_tokens: 4096 for full JSON output
+    const genSession = await P002Api.getSession();
+    const genResponse = await fetch(P002Api.SUPABASE_URL + '/functions/v1/claude-proxy', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (await P002Api.getSession()).access_token,
+        'Authorization': 'Bearer ' + genSession.access_token,
+        'apikey': P002Api.SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({
         system: systemPrompt,
         messages: [{ role: 'user', content: userMsg }],
-        model: 'sonnet'
+        model: document.getElementById('genModel').value,
+        max_tokens: 4096,
       })
     });
+    if (!genResponse.ok) throw new Error('API error: ' + genResponse.status);
+    const genData = await genResponse.json();
+    if (genData.error) throw new Error(genData.error);
+    const rawText = genData.content?.[0]?.text || '';
 
-    if (!response.ok) throw new Error('API error: ' + response.status);
-    const data = await response.json();
-    const text = data.content?.[0]?.text || '';
-
-    // Strip any markdown fencing
-    const clean = text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    // Strip any markdown fencing and parse JSON
+    const clean = rawText.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
     const parsed = JSON.parse(clean);
     return parsed;
   }
