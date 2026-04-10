@@ -4,7 +4,7 @@
 // Depends on: security.js, api.js
 // ================================================================
 
-const P002App = (() => {
+window.P002App = (() => {
 
   // ==================== STATE ====================
   let currentUser = null;
@@ -83,7 +83,9 @@ const P002App = (() => {
     if (P002Api.isAdmin(currentUser)) {
       document.getElementById('adminBtn').style.display = 'block';
     }
-    showScreen('setupScreen');
+    showScreen('homeScreen');
+    loadModuleCatalog();
+    loadContinueBanner();
   }
 
   // ==================== AUTH ====================
@@ -161,12 +163,9 @@ const P002App = (() => {
   function backToModules() {
     selectedModule = null;
     sectionData = null;
-    document.getElementById('moduleList').style.display = 'flex';
-    document.getElementById('moduleList').style.flexDirection = 'column';
-    document.getElementById('sectionPicker').style.display = 'none';
-    document.getElementById('setupLaunch').style.display = 'none';
-    const startBtn = document.getElementById('startBtn');
-    if (startBtn) startBtn.disabled = true;
+    showScreen('homeScreen');
+    // Close any open section pickers
+    document.querySelectorAll('.section-picker').forEach(p => p.classList.remove('open'));
   }
 
   async function onSectionClick(section, el) {
@@ -383,17 +382,20 @@ TEACHING BALANCE -- CRITICAL:
     currentSessionId = null;
     if (cliOpen) toggleCLI();
     document.getElementById('cliToggleFab').style.display = 'none';
-    showScreen('setupScreen');
+    showScreen('homeScreen');
     document.getElementById('endBtn').style.display = 'none';
     document.getElementById('settingsBtn').style.display = 'block';
     conversationHistory = [];
     sectionData = null;
+    selectedSection = null;
     currentNodeIndex = 0;
-    document.getElementById('startBtn').disabled = true;
+    // Reset any open section pickers
+    document.querySelectorAll('.section-picker').forEach(p => p.classList.remove('open'));
+    document.querySelectorAll('.module-card').forEach(c => c.classList.remove('active-module'));
     backToModules();
   }
 
-  function goToSetup() { showScreen('setupScreen'); }
+  function goToSetup() { showScreen('homeScreen'); }
   function showAdmin() { window.location.href = 'admin.html'; }
 
   // ==================== CHAT ====================
@@ -1002,6 +1004,181 @@ TEACHING BALANCE -- CRITICAL:
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }
 
+
+  // ==================== HOME SCREEN ====================
+  async function loadModuleCatalog() {
+    const grid = document.getElementById('moduleGrid');
+    if (!grid) return;
+
+    try {
+      // List all folders in the bucket
+      const items = await P002Api.listBucket('');
+      const folders = items.filter(f => !f.metadata && !f.name.startsWith('.'));
+
+      if (!folders.length) {
+        grid.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:14px;">No modules found. Upload content via the admin panel.</div>';
+        return;
+      }
+
+      grid.innerHTML = '';
+
+      const moduleLabels = {
+        'module_intro_web_apps': { title: 'Introduction to Web Applications', difficulty: 'beginner', sections: 17 },
+        'module_sql_injection': { title: 'SQL Injection Fundamentals', difficulty: 'intermediate', sections: 20 },
+        'module_js_deobfuscation': { title: 'JavaScript Deobfuscation', difficulty: 'intermediate', sections: 0 },
+        'module_network_enumeration': { title: 'Network Enumeration', difficulty: 'advanced', sections: 0 },
+        'module_web_requests': { title: 'Web Requests & HTTP', difficulty: 'beginner', sections: 0 },
+      };
+
+      folders.forEach((folder, idx) => {
+        const key = folder.name;
+        const label = moduleLabels[key] || { title: key.replace(/module_|_/g, ' ').trim(), difficulty: 'intermediate', sections: 0 };
+        const num = String(idx + 1).padStart(2, '0');
+        const card = buildModuleCard(key, label, num);
+        grid.appendChild(card);
+      });
+
+    } catch(e) {
+      grid.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:14px;">Error loading modules: ' + P002Security.escapeHtml(e.message) + '</div>';
+    }
+  }
+
+  function buildModuleCard(moduleKey, label, num) {
+    const card = document.createElement('div');
+    card.className = 'module-card';
+    card.dataset.module = moduleKey;
+
+    const diffClass = label.difficulty || 'intermediate';
+    const sectCount = label.sections > 0 ? label.sections + ' sections' : 'Loading...';
+
+    card.innerHTML =
+      '<div class="module-card-top">' +
+        '<div class="module-num">' + num + '</div>' +
+        '<div class="module-info">' +
+          '<div class="module-difficulty ' + diffClass + '">' + diffClass + '</div>' +
+          '<div class="module-title-text">' + P002Security.escapeHtml(label.title) + '</div>' +
+          '<div class="module-meta-text" id="meta_' + moduleKey + '">' + sectCount + ' &middot; AI coached</div>' +
+        '</div>' +
+        '<div class="module-arrow">&rarr;</div>' +
+      '</div>' +
+      '<div class="module-progress-row">' +
+        '<div class="module-progress-bar"><div class="module-progress-fill" style="width:0%"></div></div>' +
+        '<div class="module-progress-label">0%</div>' +
+      '</div>' +
+      '<div class="section-picker" id="picker_' + moduleKey + '">' +
+        '<div class="section-picker-label">Choose a section</div>' +
+        '<div class="section-list-inner" id="sections_' + moduleKey + '">' +
+          '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">Loading sections...</div>' +
+        '</div>' +
+        '<button class="start-btn" id="startBtn_' + moduleKey + '" disabled>Start Session &rarr;</button>' +
+      '</div>';
+
+    card.addEventListener('click', function(e) {
+      if (e.target.closest('.section-picker')) return;
+      toggleModulePicker(moduleKey, card);
+    });
+
+    return card;
+  }
+
+
+  async function toggleModulePicker(moduleKey, card) {
+    const picker = document.getElementById('picker_' + moduleKey);
+    const isOpen = picker.classList.contains('open');
+
+    // Close all others
+    document.querySelectorAll('.section-picker').forEach(p => p.classList.remove('open'));
+    document.querySelectorAll('.module-card').forEach(c => c.classList.remove('active-module'));
+
+    if (isOpen) return;
+
+    picker.classList.add('open');
+    card.classList.add('active-module');
+
+    // Load sections if not already loaded
+    const listEl = document.getElementById('sections_' + moduleKey);
+    if (listEl.dataset.loaded) return;
+
+    try {
+      const files = await P002Api.listBucket(moduleKey);
+      const jsonFiles = files.filter(f => f.name.endsWith('.json')).sort((a, b) => a.name.localeCompare(b.name));
+
+      listEl.innerHTML = '';
+      listEl.dataset.loaded = '1';
+
+      jsonFiles.forEach((f, idx) => {
+        const item = document.createElement('div');
+        item.className = 'section-item';
+        item.innerHTML = `
+          <div class="section-item-num">${String(idx+1).padStart(2,'0')}</div>
+          <div class="section-item-title">${P002Security.escapeHtml(f.name.replace('.json','').replace(/_/g,' '))}</div>
+          <div class="section-item-flag">⚑</div>
+        `;
+        item.onclick = async () => {
+          document.querySelectorAll('.section-item').forEach(i => i.style.background = '');
+          item.style.background = 'var(--accent-dim)';
+          selectedModule = moduleKey;
+          selectedSection = moduleKey + '/' + f.name;
+          sectionData = null;
+
+          const startBtn = document.getElementById('startBtn_' + moduleKey);
+          if (startBtn) {
+            startBtn.disabled = true;
+            startBtn.textContent = 'Loading...';
+          }
+
+          try {
+            const text = await P002Api.downloadFile(selectedSection);
+            const validation = P002Security.validateLessonJson(text);
+            if (!validation.ok) {
+              if (startBtn) { startBtn.textContent = 'Invalid section file'; }
+              return;
+            }
+            sectionData = validation.data;
+            const lesson = sectionData.lesson;
+            if (startBtn) {
+              startBtn.disabled = false;
+              startBtn.textContent = 'Start: ' + lesson.title + ' →';
+              startBtn.onclick = () => P002App.startSession();
+            }
+          } catch(e) {
+            if (startBtn) { startBtn.textContent = 'Failed to load'; }
+            sectionData = null;
+          }
+        };
+        listEl.appendChild(item);
+      });
+
+      if (!jsonFiles.length) {
+        listEl.innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No sections found in this module.</div>';
+      }
+
+      // Update section count in card
+      const metaEl = card.querySelector('.module-meta-text');
+      if (metaEl) metaEl.textContent = jsonFiles.length + ' sections · AI coached';
+
+    } catch(e) {
+      listEl.innerHTML = '<div style="color:var(--danger);font-size:12px;">' + P002Security.escapeHtml(e.message) + '</div>';
+    }
+  }
+
+  async function loadContinueBanner() {
+    try {
+      const last = await P002Api.getLastSession();
+      if (!last) return;
+      const banner = document.getElementById('continueBanner');
+      const title = document.getElementById('continueTitle');
+      const meta = document.getElementById('continueMeta');
+      if (banner && title && meta) {
+        title.textContent = last.lesson_title || 'Continue where you left off';
+        meta.textContent = (last.module_key || '').replace(/module_|_/g, ' ').trim() + ' · Section ' + (last.section_number || '?');
+        banner.classList.add('visible');
+      }
+    } catch(e) {}
+  }
+
+  let selectedSection = null;
+
   // ==================== PUBLIC API ====================
   return {
     init,
@@ -1010,6 +1187,9 @@ TEACHING BALANCE -- CRITICAL:
     switchTab,
     selectModule,
     backToModules,
+    loadModuleCatalog,
+    toggleModulePicker,
+    resumeLastSession: async () => { showScreen('chatScreen'); },
     startSession,
     endSession,
     goToSetup,
