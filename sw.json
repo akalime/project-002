@@ -1,6 +1,31 @@
-// Project 002 — Service Worker
-// Minimal — just enables PWA install, no caching strategy yet
+// Project 002 — Service Worker v1
+const CACHE = 'p002-v1';
 
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(clients.claim()));
-self.addEventListener('fetch', e => e.respondWith(fetch(e.request)));
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE).then(cache => cache.addAll([
+      '/project-002/',
+      '/project-002/index.html',
+    ])).catch(() => {})
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    )
+  );
+  e.waitUntil(clients.claim());
+});
+
+self.addEventListener('fetch', e => {
+  // Network first for API/supabase calls
+  if (e.request.url.includes('supabase') || e.request.url.includes('anthropic')) {
+    return;
+  }
+  e.respondWith(
+    fetch(e.request).catch(() => caches.match(e.request))
+  );
+});
