@@ -611,12 +611,7 @@ window.P002App = (() => {
   function buildSourceSim(ch) {
     const el = document.createElement('div');
     el.className = 'target-app';
-    const src = ch.source_content || '<!-- page source -->
-<html>
-  <body>
-    <h1>Welcome</h1>
-  </body>
-</html>';
+    const src = ch.source_content || '<!-- page source -->\n<html>\n  <body>\n    <h1>Welcome</h1>\n  </body>\n</html>';
     el.innerHTML = simAppBar('vuln-lab.local')+
       '<div style="background:#1a1a1a;">'+
         '<div style="background:#252525;padding:5px 12px;font-family:monospace;font-size:9px;color:#888;border-bottom:1px solid #333;letter-spacing:1px;">PAGE SOURCE</div>'+
