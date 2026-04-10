@@ -1409,6 +1409,10 @@ body {
 
     <!-- STATS PANEL -->
     <div class="panel" id="panelStats">
+      <div style="padding:16px;border-bottom:1px solid var(--border);">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:10px;">Module index is used by the app to list available modules. Rebuild after uploading new modules.</div>
+        <button class="editor-action-btn" id="btnRebuildIndex" onclick="P002Admin.rebuildModuleIndex()" style="background:var(--accent);color:#fff;border-color:var(--accent);">⟳ Rebuild Module Index</button>
+      </div>
       <div class="stats-panel">
         <div class="panel-header">
           <div class="panel-title">Platform Stats</div>
@@ -1539,8 +1543,8 @@ body {
 
 
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="security.js"></script>
-<script src="api.js"></script>
-<script src="admin.js"></script>
+<script src="/project-002/security.js"></script>
+<script src="/project-002/api.js"></script>
+<script src="/project-002/admin.js"></script>
 </body>
 </html>
