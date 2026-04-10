@@ -141,8 +141,17 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .reader-chat-btn:hover{border-color:var(--accent);color:var(--accent);}
 .reader-progress{height:2px;background:var(--border);flex-shrink:0;}
 .reader-progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width 0.3s ease;}
-.reader-body{flex:1;overflow-y:auto;padding:24px 20px 40px;background:var(--reader-bg);-webkit-overflow-scrolling:touch;}
+.reader-content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.reader-body{padding:24px 20px 40px;background:var(--reader-bg);}
 .reader-body ::selection{background:rgba(255,159,67,0.25);color:var(--text);}
+
+/* STICKY NEXT BAR */
+.reader-sticky-next{display:none;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;}
+.sticky-next-info{flex:1;min-width:0;}
+.sticky-next-up{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);font-weight:700;margin-bottom:3px;}
+.sticky-next-title{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sticky-next-btn{background:var(--accent);border:none;border-radius:8px;padding:9px 16px;font-family:var(--font-display);font-size:13px;font-weight:800;color:#fff;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.15s;}
+.sticky-next-btn:hover{background:#e03030;}
 
 /* CONTENT BLOCKS */
 .content-heading{font-family:var(--font-display);font-size:20px;font-weight:800;letter-spacing:-0.5px;line-height:1.2;color:var(--text);margin:24px 0 12px;padding-top:8px;border-top:1px solid var(--border);}
@@ -205,6 +214,89 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .drawer-send-btn{width:30px;height:30px;border-radius:50%;background:var(--accent);border:none;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;cursor:pointer;flex-shrink:0;transition:all 0.15s;}
 .drawer-send-btn:hover{background:#e03030;}
 .drawer-send-btn:disabled{opacity:0.3;cursor:not-allowed;}
+
+/* KNOWLEDGE CHECK */
+#kcPromptScreen{display:none;flex-direction:column;padding-top:48px;}
+#kcPromptScreen.active{display:flex;}
+#kcScreen{display:none;flex-direction:column;padding-top:48px;overflow:hidden;}
+#kcScreen.active{display:flex;}
+#kcResultsScreen{display:none;flex-direction:column;align-items:center;justify-content:center;padding:72px 24px 40px;}
+#kcResultsScreen.active{display:flex;}
+
+.kc-prompt-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center;gap:16px;}
+.kc-prompt-icon{font-size:44px;}
+.kc-prompt-complete{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;font-weight:700;color:var(--success);}
+.kc-prompt-title{font-family:var(--font-display);font-size:24px;font-weight:800;letter-spacing:-0.8px;color:var(--text);}
+.kc-prompt-sub{font-size:13px;color:var(--text-muted);line-height:1.6;max-width:260px;}
+.kc-prompt-meta{font-size:11px;color:var(--text-dim);}
+.kc-prompt-btn{width:100%;background:var(--accent2);border:none;border-radius:12px;padding:15px;font-family:var(--font-display);font-size:16px;font-weight:800;color:#000;cursor:pointer;transition:all 0.15s;letter-spacing:-0.3px;}
+.kc-prompt-btn:hover{background:#e08a30;}
+.kc-prompt-skip{font-size:12px;color:var(--text-dim);cursor:pointer;padding:6px;transition:color 0.15s;}
+.kc-prompt-skip:hover{color:var(--text-muted);}
+
+.kc-header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;flex-shrink:0;}
+.kc-eyebrow{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--accent2);font-weight:700;margin-bottom:4px;}
+.kc-title{font-family:var(--font-display);font-size:16px;font-weight:800;color:var(--text);}
+.kc-progress-row{display:flex;align-items:center;gap:6px;margin-top:8px;}
+.kc-dot{width:7px;height:7px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);flex-shrink:0;transition:all 0.2s;}
+.kc-dot.done{background:var(--success);border-color:var(--success);}
+.kc-dot.active{background:var(--accent2);border-color:var(--accent2);box-shadow:0 0 5px var(--accent2);}
+.kc-counter{margin-left:auto;font-family:var(--font-mono);font-size:9px;color:var(--text-dim);}
+
+.kc-body{flex:1;overflow-y:auto;padding:16px;}
+.kc-question{font-size:15px;color:var(--text);line-height:1.65;font-weight:600;margin-bottom:16px;}
+.kc-options{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+.kc-option{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 14px;cursor:pointer;transition:all 0.15s;}
+.kc-option:hover{border-color:var(--border2);}
+.kc-option.selected{border-color:rgba(255,159,67,0.5);background:rgba(255,159,67,0.06);}
+.kc-option.correct{border-color:rgba(74,222,128,0.5);background:rgba(74,222,128,0.06);pointer-events:none;}
+.kc-option.wrong{border-color:rgba(255,77,77,0.3);background:rgba(255,77,77,0.04);pointer-events:none;}
+.kc-letter{width:22px;height:22px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10px;color:var(--text-dim);flex-shrink:0;transition:all 0.15s;}
+.kc-option.selected .kc-letter{background:rgba(255,159,67,0.15);border-color:var(--accent2);color:var(--accent2);}
+.kc-option.correct .kc-letter{background:rgba(74,222,128,0.15);border-color:var(--success);color:var(--success);}
+.kc-option.wrong .kc-letter{background:rgba(255,77,77,0.1);border-color:var(--danger);color:var(--danger);}
+.kc-opt-text{font-size:13px;color:var(--text-muted);line-height:1.4;}
+.kc-option.selected .kc-opt-text{color:var(--accent2);}
+.kc-option.correct .kc-opt-text{color:var(--success);}
+.kc-option.wrong .kc-opt-text{color:var(--danger);}
+.kc-submit{width:100%;background:var(--accent2);border:none;border-radius:10px;padding:12px;font-family:var(--font-display);font-size:14px;font-weight:800;color:#000;cursor:pointer;transition:all 0.15s;margin-top:4px;}
+.kc-submit.disabled{background:var(--surface2);color:var(--text-dim);cursor:not-allowed;}
+.kc-submit:not(.disabled):hover{background:#e08a30;}
+
+.kc-feedback{display:none;background:var(--surface);border-top:1px solid var(--border);padding:14px 16px;flex-shrink:0;}
+.kc-feedback-result{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.kc-result-icon{font-size:18px;}
+.kc-result-text{font-family:var(--font-display);font-size:15px;font-weight:800;}
+.kc-result-text.correct{color:var(--success);}
+.kc-result-text.wrong{color:var(--danger);}
+.kc-explanation{font-size:12px;color:var(--text-muted);line-height:1.65;margin-bottom:12px;}
+.kc-next-btn{width:100%;background:var(--accent);border:none;border-radius:10px;padding:12px;font-family:var(--font-display);font-size:14px;font-weight:800;color:#fff;cursor:pointer;margin-bottom:8px;transition:all 0.15s;}
+.kc-next-btn.last{background:var(--success);color:#000;}
+.kc-explain-btn{width:100%;background:transparent;border:1px solid rgba(255,159,67,0.2);border-radius:8px;padding:9px;font-size:12px;color:rgba(255,159,67,0.7);cursor:pointer;transition:all 0.15s;display:none;}
+.kc-explain-btn:hover{border-color:var(--accent2);color:var(--accent2);}
+
+.kc-explain-drawer{display:none;background:var(--surface);border-top:1px solid var(--border);padding:12px 16px;flex-shrink:0;}
+.kc-explain-label{font-family:var(--font-mono);font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--accent2);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.kc-explain-dot{width:5px;height:5px;border-radius:50%;background:var(--accent2);box-shadow:0 0 4px var(--accent2);}
+.kc-explain-response{font-size:12px;color:var(--text-muted);line-height:1.7;margin-bottom:10px;}
+.kc-explain-input-row{display:flex;gap:8px;}
+.kc-explain-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:7px 12px;font-size:12px;color:var(--text);font-family:var(--font-body);outline:none;}
+.kc-explain-send{width:28px;height:28px;border-radius:50%;background:var(--accent2);border:none;font-size:11px;color:#000;cursor:pointer;flex-shrink:0;}
+
+/* KC RESULTS */
+.kc-results-icon{font-size:44px;margin-bottom:8px;}
+.kc-results-title{font-family:var(--font-display);font-size:22px;font-weight:800;letter-spacing:-0.8px;color:var(--text);margin-bottom:6px;}
+.kc-results-score{font-family:var(--font-display);font-size:40px;font-weight:800;color:var(--accent2);margin-bottom:4px;}
+.kc-results-pct{font-size:12px;color:var(--text-dim);margin-bottom:20px;}
+.kc-results-stats{display:flex;gap:8px;margin-bottom:24px;}
+.kc-results-stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;text-align:center;}
+.kc-results-stat-val{font-family:var(--font-display);font-size:20px;font-weight:800;color:var(--text);display:block;}
+.kc-results-stat-lbl{font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
+.kc-results-next{width:100%;background:var(--accent);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:15px;font-weight:800;color:#fff;cursor:pointer;margin-bottom:8px;transition:all 0.15s;}
+.kc-results-next:hover{background:#e03030;}
+.kc-results-actions{display:flex;gap:8px;width:100%;}
+.kc-results-action{flex:1;background:transparent;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;color:var(--text-muted);cursor:pointer;text-align:center;transition:all 0.15s;}
+.kc-results-action:hover{border-color:var(--border2);color:var(--text);}
 
 /* CHAT SCREEN */
 #chatScreen{display:none;flex-direction:column;overflow:hidden;padding-top:48px;}
@@ -401,7 +493,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <button class="reader-chat-btn" onclick="P002App.openFreeChat()" title="Ask AI tutor">💬</button>
   </div>
   <div class="reader-progress"><div class="reader-progress-fill" id="readerProgressFill" style="width:0%"></div></div>
-  <div class="reader-body" id="readerBody"></div>
+  <div class="reader-content" id="readerContent">
+    <div class="reader-body" id="readerBody"></div>
+  </div>
+  <div class="reader-sticky-next" id="readerStickyNext">
+    <div class="sticky-next-info">
+      <div class="sticky-next-up">Up next</div>
+      <div class="sticky-next-title" id="stickyNextTitle">Next section</div>
+    </div>
+    <button class="sticky-next-btn" onclick="P002App.stickyNextTapped()">Continue →</button>
+  </div>
 </div>
 
 <!-- ASK AI POPUP -->
@@ -432,6 +533,71 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   <div class="drawer-input-row">
     <input class="drawer-input-field" id="drawerInput" placeholder="Ask a follow-up..." onkeydown="if(event.key==='Enter')P002App.sendDrawerMessage()" />
     <button class="drawer-send-btn" id="drawerSendBtn" onclick="P002App.sendDrawerMessage()">↑</button>
+  </div>
+</div>
+
+<!-- KC PROMPT -->
+<div class="screen" id="kcPromptScreen">
+  <div class="module-back-bar" onclick="P002App.kcReviewSection()"><span class="module-back-arrow">←</span><span class="module-back-label">Back to section</span></div>
+  <div class="kc-prompt-body">
+    <div class="kc-prompt-icon">✓</div>
+    <div class="kc-prompt-complete">Section complete</div>
+    <div class="kc-prompt-title">Test what you just read</div>
+    <div class="kc-prompt-sub">Quick questions to lock in what you learned.</div>
+    <div class="kc-prompt-meta" id="kcPromptCount">10 questions · ~5 min</div>
+    <button class="kc-prompt-btn" onclick="P002App.startKnowledgeCheck()">Start Check →</button>
+    <div class="kc-prompt-skip" onclick="P002App.skipKcGoNext()">Skip — go to next section</div>
+  </div>
+</div>
+
+<!-- KC SCREEN -->
+<div class="screen" id="kcScreen">
+  <div class="kc-header">
+    <div class="kc-eyebrow">Knowledge Check</div>
+    <div class="kc-title" id="kcSectionTitle">Section Title</div>
+    <div class="kc-progress-row">
+      <div id="kcDots"></div>
+      <div class="kc-counter" id="kcCounter">1 / 10</div>
+    </div>
+  </div>
+  <div class="kc-body">
+    <div class="kc-question" id="kcQuestion"></div>
+    <div class="kc-options" id="kcOptions"></div>
+    <button class="kc-submit disabled" id="kcSubmitBtn">Check Answer</button>
+  </div>
+  <div class="kc-feedback" id="kcFeedback">
+    <div class="kc-feedback-result">
+      <div class="kc-result-icon" id="kcFeedbackIcon">✓</div>
+      <div class="kc-result-text" id="kcFeedbackText">Correct</div>
+    </div>
+    <div class="kc-explanation" id="kcExplanation"></div>
+    <button class="kc-next-btn" id="kcNextBtn" onclick="P002App.kcNextQuestion()">Next Question →</button>
+    <button class="kc-explain-btn" id="kcExplainBtn" onclick="P002App.kcOpenExplain()">✦ Explain this deeper</button>
+  </div>
+  <div class="kc-explain-drawer" id="kcExplainDrawer">
+    <div class="kc-explain-label"><div class="kc-explain-dot"></div>AI Explain</div>
+    <div class="kc-explain-response" id="kcExplainResponse">···</div>
+    <div class="kc-explain-input-row">
+      <input class="kc-explain-input" id="kcExplainInput" placeholder="Ask a follow-up..." onkeydown="if(event.key==='Enter')P002App.kcSendExplainMessage()" />
+      <button class="kc-explain-send" onclick="P002App.kcSendExplainMessage()">↑</button>
+    </div>
+  </div>
+</div>
+
+<!-- KC RESULTS -->
+<div class="screen" id="kcResultsScreen">
+  <div class="kc-results-icon" id="kcResultsIcon">📖</div>
+  <div class="kc-results-title" id="kcResultsTitle">Results</div>
+  <div class="kc-results-score" id="kcResultsScore">0/0</div>
+  <div class="kc-results-pct" id="kcResultsPct">0%</div>
+  <div class="kc-results-stats">
+    <div class="kc-results-stat"><span class="kc-results-stat-val" id="kcResultsMissed">0</span><span class="kc-results-stat-lbl">Missed</span></div>
+    <div class="kc-results-stat"><span class="kc-results-stat-val" id="kcResultsTotal">0</span><span class="kc-results-stat-lbl">Total</span></div>
+  </div>
+  <button class="kc-results-next" id="kcResultsNextBtn">Next Section →</button>
+  <div class="kc-results-actions">
+    <button class="kc-results-action" onclick="P002App.kcRetry()">Retry check</button>
+    <button class="kc-results-action" onclick="P002App.kcReviewSection()">Re-read section</button>
   </div>
 </div>
 
