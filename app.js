@@ -998,159 +998,187 @@ TEACHING BALANCE -- CRITICAL:
 
 
   // ==================== HOME SCREEN ====================
+
+  const CATEGORY_ICONS = {
+    'Web Fundamentals': '🌐',
+    'Web Exploitation': '⚡',
+    'Network': '📡',
+    'Defense': '🛡',
+    'Systems': '💻',
+    'Other': '📚',
+  };
+
   async function loadModuleCatalog() {
     const grid = document.getElementById('moduleGrid');
     if (!grid) return;
 
     try {
-      // List all folders in the bucket
+      // List bucket root folders
       const items = await P002Api.listBucket('');
       const folders = items.filter(f => !f.metadata && !f.name.startsWith('.'));
 
       if (!folders.length) {
-        grid.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:14px;">No modules found. Upload content via the admin panel.</div>';
+        grid.innerHTML = '<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">No modules found. Upload content via the admin panel.</div>';
         return;
       }
 
+      // Load manifests for all folders in parallel
+      const manifests = await Promise.all(folders.map(async (folder) => {
+        try {
+          const text = await P002Api.downloadFile(folder.name + '/manifest.json');
+          return JSON.parse(text);
+        } catch(e) {
+          // No manifest — build a minimal one from folder name
+          return {
+            module_key: folder.name,
+            title: folder.name.replace(/module_|_/g, ' ').trim().replace(/\w/g, c => c.toUpperCase()),
+            description: '',
+            difficulty: 'intermediate',
+            category: 'Other',
+            estimated_hours: 0,
+            sections: []
+          };
+        }
+      }));
+
+      // Group by category
+      const categories = {};
+      manifests.forEach(m => {
+        const cat = m.category || 'Other';
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(m);
+      });
+
       grid.innerHTML = '';
 
-      const moduleLabels = {
-        'module_intro_web_apps': { title: 'Introduction to Web Applications', difficulty: 'beginner', sections: 17 },
-        'module_sql_injection': { title: 'SQL Injection Fundamentals', difficulty: 'intermediate', sections: 20 },
-        'module_js_deobfuscation': { title: 'JavaScript Deobfuscation', difficulty: 'intermediate', sections: 0 },
-        'module_network_enumeration': { title: 'Network Enumeration', difficulty: 'advanced', sections: 0 },
-        'module_web_requests': { title: 'Web Requests & HTTP', difficulty: 'beginner', sections: 0 },
-      };
+      Object.entries(categories).forEach(([cat, mods]) => {
+        const group = document.createElement('div');
+        group.className = 'category-group';
 
-      folders.forEach((folder, idx) => {
-        const key = folder.name;
-        const label = moduleLabels[key] || { title: key.replace(/module_|_/g, ' ').trim(), difficulty: 'intermediate', sections: 0 };
-        const num = String(idx + 1).padStart(2, '0');
-        const card = buildModuleCard(key, label, num);
-        grid.appendChild(card);
+        const label = document.createElement('div');
+        label.className = 'category-label';
+        label.textContent = cat;
+        group.appendChild(label);
+
+        mods.forEach((manifest, idx) => {
+          const card = buildManifestCard(manifest, idx);
+          group.appendChild(card);
+        });
+
+        grid.appendChild(group);
       });
 
     } catch(e) {
-      grid.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:14px;">Error loading modules: ' + P002Security.escapeHtml(e.message) + '</div>';
+      grid.innerHTML = '<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">Error loading modules: ' + P002Security.escapeHtml(e.message) + '</div>';
     }
   }
 
-  function buildModuleCard(moduleKey, label, num) {
+  function buildManifestCard(manifest, idx) {
     const card = document.createElement('div');
     card.className = 'module-card';
-    card.dataset.module = moduleKey;
+    card.dataset.module = manifest.module_key;
 
-    const diffClass = label.difficulty || 'intermediate';
-    const sectCount = label.sections > 0 ? label.sections + ' sections' : 'Loading...';
+    const icon = CATEGORY_ICONS[manifest.category] || '📚';
+    const totalMins = manifest.sections.reduce((a, s) => a + (s.minutes || 0), 0);
+    const hours = totalMins > 0 ? (totalMins / 60).toFixed(1) + 'h' : (manifest.estimated_hours + 'h');
+    const secCount = manifest.sections.length;
 
-    card.innerHTML =
-      '<div class="module-card-top">' +
-        '<div class="module-num">' + num + '</div>' +
-        '<div class="module-info">' +
-          '<div class="module-difficulty ' + diffClass + '">' + diffClass + '</div>' +
-          '<div class="module-title-text">' + P002Security.escapeHtml(label.title) + '</div>' +
-          '<div class="module-meta-text" id="meta_' + moduleKey + '">' + sectCount + ' &middot; AI coached</div>' +
+    const header = card.querySelector ? null : null; // built below
+
+    const headerDiv = card.innerHTML =
+      '<div class="module-card-header">' +
+        '<div class="module-icon">' + icon + '</div>' +
+        '<div class="module-header-info">' +
+          '<div class="module-difficulty-badge ' + (manifest.difficulty || 'intermediate') + '">' + (manifest.difficulty || 'intermediate') + '</div>' +
+          '<div class="module-card-title">' + P002Security.escapeHtml(manifest.title) + '</div>' +
+          '<div class="module-card-meta">' + (secCount > 0 ? secCount + ' sections' : 'No sections') + ' &middot; ' + hours + ' &middot; AI coached</div>' +
         '</div>' +
-        '<div class="module-arrow">&rarr;</div>' +
+        '<div class="module-chevron">&#9660;</div>' +
       '</div>' +
-      '<div class="module-progress-row">' +
-        '<div class="module-progress-bar"><div class="module-progress-fill" style="width:0%"></div></div>' +
-        '<div class="module-progress-label">0%</div>' +
-      '</div>' +
-      '<div class="section-picker" id="picker_' + moduleKey + '">' +
-        '<div class="section-picker-label">Choose a section</div>' +
-        '<div class="section-list-inner" id="sections_' + moduleKey + '">' +
-          '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">Loading sections...</div>' +
-        '</div>' +
-        '<button class="start-btn" id="startBtn_' + moduleKey + '" disabled>Start Session &rarr;</button>' +
+      '<div class="module-sections" id="sections_' + manifest.module_key + '">' +
+        (manifest.description ? '<div class="module-desc">' + P002Security.escapeHtml(manifest.description) + '</div>' : '') +
+        manifest.sections.map(function(s, i) {
+          return '<div class="section-row ' + (s.has_flag ? 'has-flag' : '') + '" ' +
+            'data-file="' + manifest.module_key + '/' + s.file + '" ' +
+            'data-title="' + P002Security.escapeHtml(s.title) + '" ' +
+            'data-meta="' + P002Security.escapeHtml(manifest.title) + ' · Section ' + (i+1) + '/' + secCount + '">' +
+            '<div class="section-num">' + String(i+1).padStart(2,'0') + '</div>' +
+            '<div class="section-info">' +
+              '<div class="section-title">' + P002Security.escapeHtml(s.title) + '</div>' +
+              '<div class="section-meta-row">' +
+                '<span class="section-time">⏱ ' + (s.minutes || '?') + ' min</span>' +
+                '<span class="section-diff ' + (s.difficulty || 'beginner') + '">' + (s.difficulty || '') + '</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="section-flag">⚑</div>' +
+          '</div>';
+        }).join('') +
       '</div>';
 
-    card.addEventListener('click', function(e) {
-      if (e.target.closest('.section-picker')) return;
-      toggleModulePicker(moduleKey, card);
+    // Wire header click via event listener
+    card.querySelector('.module-card-header').addEventListener('click', function() {
+      P002App.toggleManifestCard(manifest.module_key);
     });
 
-    return card;
+    // Wire section row clicks
+    card.querySelectorAll('.section-row').forEach(function(row) {
+      row.addEventListener('click', function() {
+        P002App.selectSection(row);
+      });
+    });
+
+        return card;
   }
 
+  function toggleManifestCard(moduleKey) {
+    const card = document.querySelector('[data-module="' + moduleKey + '"]');
+    if (!card) return;
+    const isExpanded = card.classList.contains('expanded');
+    // Close all
+    document.querySelectorAll('.module-card').forEach(c => c.classList.remove('expanded'));
+    if (!isExpanded) card.classList.add('expanded');
+  }
 
-  async function toggleModulePicker(moduleKey, card) {
-    const picker = document.getElementById('picker_' + moduleKey);
-    const isOpen = picker.classList.contains('open');
+  async function selectSection(el) {
+    // Deselect all
+    document.querySelectorAll('.section-row').forEach(r => r.classList.remove('selected'));
+    el.classList.add('selected');
 
-    // Close all others
-    document.querySelectorAll('.section-picker').forEach(p => p.classList.remove('open'));
-    document.querySelectorAll('.module-card').forEach(c => c.classList.remove('active-module'));
+    const filePath = el.dataset.file;
+    const title = el.dataset.title;
+    const meta = el.dataset.meta;
 
-    if (isOpen) return;
+    // Show launch bar immediately
+    const launchBar = document.getElementById('launchBar');
+    const launchTitle = document.getElementById('launchBarTitle');
+    const launchMeta = document.getElementById('launchBarMeta');
+    const launchBtn = document.getElementById('launchBtn');
 
-    picker.classList.add('open');
-    card.classList.add('active-module');
+    launchTitle.textContent = title;
+    launchMeta.textContent = meta + ' — Loading...';
+    launchBar.classList.add('visible');
+    launchBtn.disabled = true;
+    launchBtn.textContent = 'Loading...';
 
-    // Load sections if not already loaded
-    const listEl = document.getElementById('sections_' + moduleKey);
-    if (listEl.dataset.loaded) return;
+    sectionData = null;
+    selectedSection = filePath;
+    selectedModule = filePath.split('/')[0];
 
     try {
-      const files = await P002Api.listBucket(moduleKey);
-      const jsonFiles = files.filter(f => f.name.endsWith('.json')).sort((a, b) => a.name.localeCompare(b.name));
-
-      listEl.innerHTML = '';
-      listEl.dataset.loaded = '1';
-
-      jsonFiles.forEach((f, idx) => {
-        const item = document.createElement('div');
-        item.className = 'section-item';
-        item.innerHTML = `
-          <div class="section-item-num">${String(idx+1).padStart(2,'0')}</div>
-          <div class="section-item-title">${P002Security.escapeHtml(f.name.replace('.json','').replace(/_/g,' '))}</div>
-          <div class="section-item-flag">⚑</div>
-        `;
-        item.onclick = async () => {
-          document.querySelectorAll('.section-item').forEach(i => i.style.background = '');
-          item.style.background = 'var(--accent-dim)';
-          selectedModule = moduleKey;
-          selectedSection = moduleKey + '/' + f.name;
-          sectionData = null;
-
-          const startBtn = document.getElementById('startBtn_' + moduleKey);
-          if (startBtn) {
-            startBtn.disabled = true;
-            startBtn.textContent = 'Loading...';
-          }
-
-          try {
-            const text = await P002Api.downloadFile(selectedSection);
-            const validation = P002Security.validateLessonJson(text);
-            if (!validation.ok) {
-              if (startBtn) { startBtn.textContent = 'Invalid section file'; }
-              return;
-            }
-            sectionData = validation.data;
-            const lesson = sectionData.lesson;
-            if (startBtn) {
-              startBtn.disabled = false;
-              startBtn.textContent = 'Start: ' + lesson.title + ' →';
-              startBtn.onclick = () => P002App.startSession();
-            }
-          } catch(e) {
-            if (startBtn) { startBtn.textContent = 'Failed to load'; }
-            sectionData = null;
-          }
-        };
-        listEl.appendChild(item);
-      });
-
-      if (!jsonFiles.length) {
-        listEl.innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No sections found in this module.</div>';
+      const text = await P002Api.downloadFile(filePath);
+      const validation = P002Security.validateLessonJson(text);
+      if (!validation.ok) {
+        launchMeta.textContent = 'Invalid section file';
+        return;
       }
-
-      // Update section count in card
-      const metaEl = card.querySelector('.module-meta-text');
-      if (metaEl) metaEl.textContent = jsonFiles.length + ' sections · AI coached';
-
+      sectionData = validation.data;
+      const lesson = sectionData.lesson;
+      launchMeta.textContent = meta;
+      launchBtn.disabled = false;
+      launchBtn.textContent = 'Start Session →';
     } catch(e) {
-      listEl.innerHTML = '<div style="color:var(--danger);font-size:12px;">' + P002Security.escapeHtml(e.message) + '</div>';
+      launchMeta.textContent = 'Failed to load: ' + P002Security.escapeHtml(e.message);
+      launchBtn.textContent = 'Error';
     }
   }
 
@@ -1169,6 +1197,11 @@ TEACHING BALANCE -- CRITICAL:
     } catch(e) {}
   }
 
+  function resumeLastSession() {
+    // For now just scroll to modules
+    document.getElementById('moduleGrid').scrollIntoView({ behavior: 'smooth' });
+  }
+
   let selectedSection = null;
 
   // ==================== PUBLIC API ====================
@@ -1180,8 +1213,9 @@ TEACHING BALANCE -- CRITICAL:
     selectModule,
     backToModules,
     loadModuleCatalog,
-    toggleModulePicker,
-    resumeLastSession: async () => { showScreen('chatScreen'); },
+    toggleManifestCard,
+    selectSection,
+    resumeLastSession,
     startSession,
     endSession,
     goToSetup,
