@@ -515,21 +515,18 @@ TEACHING BALANCE -- CRITICAL:
   function addMessage(role, content) {
     const msgs = document.getElementById('messages');
     const div = document.createElement('div');
-    div.className = `msg ${role}`;
+    div.className = 'message ' + role;
 
-    const avatar = document.createElement('div');
-    avatar.className = 'msg-avatar';
-    avatar.textContent = role === 'assistant' ? 'AI' : 'YOU';
+    const roleLabel = document.createElement('div');
+    roleLabel.className = 'msg-role';
+    roleLabel.textContent = role === 'assistant' ? 'AI' : 'You';
 
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'msg-content';
     const bubble = document.createElement('div');
     bubble.className = 'msg-bubble';
     bubble.innerHTML = formatMessage(content);
-    contentDiv.appendChild(bubble);
 
-    div.appendChild(avatar);
-    div.appendChild(contentDiv);
+    div.appendChild(roleLabel);
+    div.appendChild(bubble);
     msgs.appendChild(div);
     msgs.scrollTop = msgs.scrollHeight;
   }
