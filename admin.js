@@ -315,9 +315,10 @@ STRICT RULES — you MUST follow these:
 - Each body block: 1-2 sentences only
 - Pick the 3-4 most important concepts, ignore everything else
 - challenge must always be null
-- For knowledge_check: target 10 questions, max 20. Mix all 3 types (mc, tf, sa).
-- If the source material contains review questions or assessment questions, extract them directly and set source to "extracted". Otherwise generate questions from the content and set source to "generated".
+- For knowledge_check: generate exactly 5 questions. Mix mc, tf, sa types.
+- If the source material contains review questions, extract up to 5 of them and set source to "extracted". Otherwise generate and set source to "generated".
 - Every question MUST relate directly to content in this section only
+- Each explanation: 1 sentence max
 - Your ENTIRE JSON response must be under 1800 tokens`;
 
     const userMsg = `Convert this chapter into a reader section. Chapter title: "${chapter.title}"\n\nContent:\n${chapter.text}`;
