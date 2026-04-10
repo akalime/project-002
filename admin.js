@@ -4,7 +4,7 @@
 // Depends on: security.js, api.js
 // ================================================================
 
-const P002Admin = (() => {
+window.P002Admin = (() => {
 
   // ==================== STATE ====================
   let currentUser = null;
@@ -796,6 +796,65 @@ const P002Admin = (() => {
     }
   }
 
+  // ==================== MODULE INDEX ====================
+  async function rebuildModuleIndex() {
+    const btn = document.getElementById('btnRebuildIndex');
+    if (btn) { btn.disabled = true; btn.textContent = 'Building...'; }
+    toast('Scanning manifests...', 'ok');
+
+    try {
+      // List all bucket folders
+      const items = await P002Api.listBucket('');
+      const folders = items.filter(f => !f.metadata && !f.name.startsWith('.'));
+
+      const modules = [];
+
+      for (const folder of folders) {
+        try {
+          const data = await P002Api.adminGetFile(folder.name + '/manifest.json');
+          const manifest = JSON.parse(data.content);
+          const totalMins = (manifest.sections || []).reduce((a, s) => a + (s.minutes || 0), 0);
+          modules.push({
+            key: manifest.module_key || folder.name,
+            module_key: manifest.module_key || folder.name,
+            title: manifest.title || folder.name,
+            category: manifest.category || 'Other',
+            difficulty: manifest.difficulty || 'intermediate',
+            section_count: (manifest.sections || []).length,
+            estimated_hours: totalMins > 0 ? parseFloat((totalMins / 60).toFixed(1)) : (manifest.estimated_hours || 0),
+            icon: manifest.icon || null
+          });
+        } catch(e) {
+          console.warn('No manifest for', folder.name, e.message);
+          // Include folder anyway with minimal info
+          modules.push({
+            key: folder.name,
+            module_key: folder.name,
+            title: folder.name.replace(/module_|_/g, ' ').trim(),
+            category: 'Other',
+            difficulty: 'intermediate',
+            section_count: 0,
+            estimated_hours: 0,
+            icon: null
+          });
+        }
+      }
+
+      const index = {
+        updated: new Date().toISOString().split('T')[0],
+        modules
+      };
+
+      await P002Api.adminSaveFile('index.json', JSON.stringify(index, null, 2));
+      toast('Index rebuilt: ' + modules.length + ' modules', 'ok');
+
+      if (btn) { btn.disabled = false; btn.textContent = '⟳ Rebuild Module Index'; }
+    } catch(e) {
+      toast('Rebuild failed: ' + e.message, 'err');
+      if (btn) { btn.disabled = false; btn.textContent = '⟳ Rebuild Module Index'; }
+    }
+  }
+
   // ==================== HELPERS ====================
   function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
@@ -844,6 +903,7 @@ const P002Admin = (() => {
     loadStats,
     runSql,
     closeModal,
+    rebuildModuleIndex,
   };
 
 })();
