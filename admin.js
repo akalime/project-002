@@ -135,19 +135,21 @@ window.P002Admin = (() => {
     const title = document.getElementById('genTitle').value.trim();
     if (!key || !title) { toast('Module key and title required', 'err'); return; }
 
+    const pageFrom = parseInt(document.getElementById('genPageFrom').value) || 1;
+    const pageTo = parseInt(document.getElementById('genPageTo').value) || 9999;
+
     showGenStep(2);
     document.getElementById('genProgressTitle').textContent = title;
     genSections = [];
 
-    // Extract PDF text using PDF.js from CDN
     logGen('working', '⟳ Loading PDF.js...');
     await loadPdfJs();
 
-    logGen('working', '⟳ Extracting text from PDF...');
+    logGen('working', '⟳ Extracting pages ' + pageFrom + '–' + pageTo + '...');
     let chapters;
     try {
-      chapters = await extractPdfChapters(genPdfFile);
-      logGen('ok', '✓ PDF loaded — ' + chapters.length + ' chapters detected');
+      chapters = await extractPdfChapters(genPdfFile, pageFrom, pageTo);
+      logGen('ok', '✓ Extracted — ' + chapters.length + ' sections detected');
     } catch(e) {
       logGen('err', '✗ PDF extraction failed: ' + e.message);
       return;
@@ -166,11 +168,13 @@ window.P002Admin = (() => {
         genSections.push(section);
         logGen('ok', '✓ Section ' + String(i+1).padStart(2,'0') + ' done — ' + section.meta.title +
           ' (' + section.meta.minutes + ' min, ' + section.content.length + ' blocks)');
-        const remaining = Math.round((total - i - 1) * 30);
+        const remaining = Math.round((total - i - 1) * 35);
         document.getElementById('genTimeEst').textContent = remaining > 0 ? '~' + remaining + 's remaining · using Sonnet' : 'Almost done...';
       } catch(e) {
         logGen('err', '✗ Section ' + (i+1) + ' failed: ' + e.message);
       }
+      // Rate limit buffer — 500ms between calls
+      await new Promise(r => setTimeout(r, 500));
     }
 
     updateProgress(100, 'Complete', 'All sections generated');
@@ -191,53 +195,56 @@ window.P002Admin = (() => {
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 
-  async function extractPdfChapters(file) {
+  async function extractPdfChapters(file, pageFrom, pageTo) {
+    pageFrom = pageFrom || 1;
+    pageTo = pageTo || 9999;
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const numPages = pdf.numPages;
+    const startPage = Math.max(1, pageFrom);
+    const endPage = Math.min(numPages, pageTo);
     let fullText = '';
 
-    // Extract all text
-    for (let p = 1; p <= numPages; p++) {
+    for (let p = startPage; p <= endPage; p++) {
       const page = await pdf.getPage(p);
       const content = await page.getTextContent();
-      const pageText = content.items.map(i => i.str).join(' ');
+      const pageText = content.items.map(function(i) { return i.str; }).join(' ');
       fullText += pageText + '\n';
     }
 
-    // Split into chapters — try to detect by common chapter patterns
-    // Split on "Chapter N" or by roughly equal chunks
-    const chapterPattern = /(?:Chapter\s+\d+[:\s]|CHAPTER\s+\d+|^\d+\.\s+[A-Z])/gm;
-    const matches = [...fullText.matchAll(chapterPattern)];
+    // Try chapter detection
+    const chapterPattern = /Chapter\s+\d+|CHAPTER\s+\d+/gm;
+    const matches = Array.from(fullText.matchAll(chapterPattern));
 
     if (matches.length >= 2) {
       const chapters = [];
       for (let i = 0; i < matches.length; i++) {
-        const start = matches[i].index;
-        const end = i < matches.length - 1 ? matches[i+1].index : fullText.length;
-        const text = fullText.slice(start, end).trim();
-        if (text.length > 200) {
-          const titleLine = text.split('\n')[0].trim().slice(0,80);
-          chapters.push({ title: titleLine, text: text.slice(0, 8000) });
+        const s = matches[i].index;
+        const e = i < matches.length - 1 ? matches[i+1].index : fullText.length;
+        const text = fullText.slice(s, e).trim();
+        if (text.length > 300) {
+          const titleLine = text.split('\\n')[0].trim().slice(0, 80);
+          chapters.push({ title: titleLine, text: text.slice(0, 12000) });
         }
       }
-      if (chapters.length > 0) return chapters;
+      if (chapters.length > 0) return chapters.slice(0, 20);
     }
 
-    // Fallback: split into ~2000 word chunks
-    const words = fullText.split(/\s+/);
-    const chunkSize = Math.max(500, Math.floor(words.length / 12));
+    // Fallback: equal-size chunks capped at 20
+    const words = fullText.split(/\s+/).filter(function(w) { return w.length > 0; });
+    const numChunks = Math.min(20, Math.max(3, Math.floor(words.length / 600)));
+    const chunkSize = Math.ceil(words.length / numChunks);
     const chapters = [];
-    for (let i = 0; i < words.length; i += chunkSize) {
+    for (let i = 0; i < words.length && chapters.length < 20; i += chunkSize) {
       const chunk = words.slice(i, i + chunkSize).join(' ');
-      if (chunk.trim().length > 100) {
+      if (chunk.trim().length > 200) {
         chapters.push({
           title: 'Section ' + (chapters.length + 1),
-          text: chunk
+          text: chunk.slice(0, 12000)
         });
       }
     }
-    return chapters.slice(0, 20); // cap at 20
+    return chapters;
   }
 
   async function generateSection(chapter, sectionNum, totalSections, moduleKey, moduleTitle, category, difficulty) {
