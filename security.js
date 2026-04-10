@@ -3,7 +3,7 @@
 // Shared security utilities for index.html and admin.html
 // ================================================================
 
-const P002Security = (() => {
+window.P002Security = (() => {
 
   // ==================== CONSTANTS ====================
   const MAX_ZIP_SIZE = 10 * 1024 * 1024; // 10MB
@@ -273,7 +273,23 @@ const P002Security = (() => {
         continue;
       }
 
-      // Validate JSON and schema
+      // Skip lesson schema validation for manifest files
+      const baseName = filename.split('/').pop();
+      if (baseName === 'manifest.json') {
+        // Just validate it's valid JSON
+        try {
+          JSON.parse(content);
+          result.ok = true;
+          result.content = content;
+          results.push(result);
+        } catch(e) {
+          result.errors.push('manifest.json is not valid JSON: ' + e.message);
+          results.push(result);
+        }
+        continue;
+      }
+
+      // Validate JSON and schema for lesson files
       const validation = validateLessonJson(content);
       if (!validation.ok) {
         result.errors = validation.errors;
