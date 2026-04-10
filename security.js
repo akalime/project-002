@@ -15,7 +15,8 @@ window.P002Security = (() => {
   const VALID_NODE_TYPES = [
     'knowledge_probe', 'concept_delivery', 'scenario_application',
     'attack_examples', 'comprehension_check', 'practice_transition',
-    'extension', 'session_wrap'
+    'extension', 'session_wrap',
+    'deliver', 'check', 'reinforce', 'apply'
   ];
   const ALLOWED_FOLDERS = [
     'module_intro_web_apps',
