@@ -965,5 +965,12 @@ input,textarea,select { font-family:var(--font-body); }
 <script src="/project-002/security.js"></script>
 <script src="/project-002/api.js"></script>
 <script src="/project-002/admin.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/project-002/sw.js').catch(() => {});
+  });
+}
+</script>
 </body>
 </html>
