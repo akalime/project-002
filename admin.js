@@ -1163,6 +1163,26 @@ STRICT RULES — you MUST follow these:
   }
 
   // ── MODULE EDITOR ─────────────────────────────────────────────
+  async function deleteFolder(folderName) {
+    try {
+      toast('Deleting files...', 'ok');
+      const files = await P002Api.listBucket(folderName);
+      if (!files.length) { toast('Folder empty or already deleted', 'warn'); return; }
+      let deleted = 0; let failed = 0;
+      for (const f of files) {
+        const path = folderName + '/' + f.name;
+        try {
+          await P002Api.adminRequest('delete_bucket_file', { path });
+          deleted++;
+        } catch(e) {
+          try { await P002Api.deleteFile(path); deleted++; } catch(e2) { failed++; }
+        }
+      }
+      toast('Deleted ' + deleted + ' files' + (failed ? ', ' + failed + ' failed' : ''), failed ? 'warn' : 'ok');
+    } catch(e) {
+      toast('Delete failed: ' + e.message, 'err');
+    }
+  }
 
   // ── REBUILD INDEX ─────────────────────────────────────────────
   async function rebuildIndex() {
