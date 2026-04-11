@@ -325,7 +325,7 @@ window.P002App = (() => {
     removeTextSelectionHandler();
     showScreen('sectionScreen');
   }
-  function showAdmin() { window.location.href = 'admin.html'; }
+  function showAdmin() { window.location.href = '/project-002/admin.html'; }
 
   // ==================== START READING ====================
   async function startReading() {
@@ -774,8 +774,11 @@ window.P002App = (() => {
   function formatBodyText(text) {
     // Escape HTML first
     let safe = P002Security.escapeHtml(text);
-    // Then apply formatting
+    // Parse markdown headings before other formatting
     safe = safe
+      .replace(/^### (.+)$/gm, '<strong style="font-size:13px;color:var(--text);">$1</strong>')
+      .replace(/^## (.+)$/gm, '<strong style="font-size:15px;color:var(--text);display:block;margin:10px 0 4px;">$1</strong>')
+      .replace(/^# (.+)$/gm, '<strong style="font-size:17px;color:var(--text);display:block;margin:14px 0 6px;">$1</strong>')
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\n\n/g, '</p><p>')
