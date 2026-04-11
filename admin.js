@@ -1359,9 +1359,13 @@ STRICT RULES — you MUST follow these:
   function formatResponse(text) {
     if (!text) return '';
     let s = P002Security.escapeHtml(text);
-    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-         .replace(/`([^`]+)`/g, '<code style="font-family:var(--font-mono);font-size:9px;color:#ffd166;background:#050505;padding:1px 5px;border-radius:3px;">$1</code>')
-         .replace(/\n/g, '<br>');
+    s = s
+      .replace(/^### (.+)$/gm, '<strong style="font-size:10px;color:#ccc;display:block;margin:6px 0 2px;">$1</strong>')
+      .replace(/^## (.+)$/gm, '<strong style="font-size:11px;color:#ddd;display:block;margin:8px 0 3px;">$1</strong>')
+      .replace(/^# (.+)$/gm, '<strong style="font-size:12px;color:#eee;display:block;margin:10px 0 4px;">$1</strong>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code style="font-family:var(--font-mono);font-size:9px;color:#ffd166;background:#050505;padding:1px 5px;border-radius:3px;">$1</code>')
+      .replace(/\n/g, '<br>');
     return s;
   }
 
