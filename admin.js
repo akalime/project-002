@@ -82,7 +82,7 @@ window.P002Admin = (() => {
     document.getElementById('tab-' + name)?.classList.add('active');
     currentTab = name;
     if (name === 'home') loadHomeStats();
-    if (name === 'files') loadFiles();
+    if (name === 'files') loadModuleEditor();
     if (name === 'sessions') loadSessions();
   }
 
@@ -527,480 +527,496 @@ STRICT RULES — you MUST follow these:
     document.getElementById('genProgFill').style.width = pct + '%';
   }
 
-  // ── FILES ──────────────────────────────────────────────────────
-  async function loadFiles() {
-    showFilesView('list');
-    const list = document.getElementById('fileList');
+  // ── MODULE EDITOR ─────────────────────────────────────────────
+  // State
+  let meView = 'list';          // 'list' | 'module' | 'section' | 'edit-meta'
+  let meCurrentModule = null;   // { folderName, manifest }
+  let meCurrentSection = null;  // { file, idx }
+  let meBlockTab = 'blocks';    // 'blocks' | 'questions' | 'chat' | 'raw'
+  let meChatHistory = [];
+
+  // ── MODULE LIST ────────────────────────────────────────────────
+  async function loadModuleEditor() {
+    showMeView('list');
+    const list = document.getElementById('meModuleList');
     list.innerHTML = '<div class="loading-center">Loading...</div>';
     try {
       const items = await P002Api.listBucket('');
-      list.innerHTML = '';
-      const folders = items.filter(f => !f.metadata && !f.name.startsWith('.'));
-      const rootFiles = items.filter(f => f.metadata);
+      const folders = items.filter(f => !f.metadata && !f.name.startsWith('.') && f.name.startsWith('module_') && f.name.length <= 60);
 
-      for (const folder of folders) {
-        const folderEl = await buildFolderItem(folder.name);
-        list.appendChild(folderEl);
+      list.innerHTML = '';
+      if (!folders.length) {
+        list.innerHTML = '<div class="loading-center">No modules yet — use Generate to create one.</div>';
+        return;
       }
-      rootFiles.forEach(f => list.appendChild(buildFileItem(f, '')));
+
+      // Group by category — need manifests
+      const modules = [];
+      for (const folder of folders) {
+        try {
+          const data = await P002Api.adminGetFile(folder.name + '/manifest.json');
+          const manifest = JSON.parse(data.content);
+          modules.push({ folderName: folder.name, manifest });
+        } catch(e) {
+          modules.push({ folderName: folder.name, manifest: {
+            title: folder.name.replace(/module_|_/g, ' ').trim(),
+            category: 'Other', difficulty: 'beginner',
+            section_count: 0, estimated_hours: 0, icon: '📚',
+            sections: [], module_key: folder.name
+          }});
+        }
+      }
+
+      // Group by category
+      const cats = {};
+      modules.forEach(m => {
+        const cat = m.manifest.category || 'Other';
+        if (!cats[cat]) cats[cat] = [];
+        cats[cat].push(m);
+      });
+
+      Object.entries(cats).forEach(([cat, mods]) => {
+        const catLabel = document.createElement('div');
+        catLabel.className = 'me-cat-label';
+        catLabel.textContent = cat;
+        list.appendChild(catLabel);
+        mods.forEach(m => list.appendChild(buildModuleCard(m)));
+      });
     } catch(e) {
       list.innerHTML = '<div class="loading-center" style="color:var(--accent);">Error: ' + P002Security.escapeHtml(e.message) + '</div>';
     }
   }
 
-  async function buildFolderItem(folderName) {
+  function buildModuleCard(m) {
     const el = document.createElement('div');
-    el.className = 'folder-item';
-
-    const header = document.createElement('div');
-    header.className = 'folder-header';
-    const arrow = document.createElement('div');
-    arrow.className = 'folder-arrow';
-    arrow.textContent = '▶';
-    header.innerHTML =
-      '<div class="folder-icon">📁</div>' +
-      '<div class="folder-name">' + P002Security.escapeHtml(folderName) + '</div>' +
-      '<button class="folder-del" onclick="event.stopPropagation();P002Admin.deleteFolder(\'' + P002Security.escapeHtml(folderName) + '\')">🗑</button>';
-    header.insertBefore(arrow, header.firstChild);
-
-    const filesDiv = document.createElement('div');
-    filesDiv.className = 'folder-files';
-
-    let loaded = false;
-    header.onclick = async () => {
-      const isOpen = filesDiv.classList.contains('open');
-      if (!isOpen && !loaded) {
-        loaded = true;
-        filesDiv.innerHTML = '<div style="padding:8px 12px;font-family:var(--font-mono);font-size:9px;color:var(--text-muted);">Loading...</div>';
-        try {
-          const data = await P002Api.listBucket(folderName);
-          filesDiv.innerHTML = '';
-          data.forEach(f => filesDiv.appendChild(buildFileItem(f, folderName)));
-        } catch(e) {}
-      }
-      filesDiv.classList.toggle('open', !isOpen);
-      arrow.classList.toggle('open', !isOpen);
-    };
-
-    el.appendChild(header);
-    el.appendChild(filesDiv);
-    return el;
-  }
-
-  function buildFileItem(file, folder) {
-    const path = folder ? folder + '/' + file.name : file.name;
-    const el = document.createElement('div');
-    el.className = 'file-item';
+    el.className = 'me-module-card';
+    const diff = m.manifest.difficulty || 'beginner';
+    const diffColors = { beginner: 'var(--success)', intermediate: 'var(--warn)', advanced: 'var(--accent)' };
     el.innerHTML =
-      '<div class="file-dot"></div>' +
-      '<div class="file-name">' + P002Security.escapeHtml(file.name) + '</div>' +
-      '<div class="file-size">' + (file.metadata?.size ? Math.ceil(file.metadata.size/1024) + 'KB' : '') + '</div>' +
-      '<button class="file-del" onclick="event.stopPropagation();P002Admin.deleteFile(\'' + P002Security.escapeHtml(path) + '\')">🗑</button>';
-    el.onclick = () => openFile(path, file.name);
+      '<div class="me-card-icon">' + (m.manifest.icon || '📚') + '</div>' +
+      '<div class="me-card-info">' +
+        '<div class="me-card-diff" style="color:' + (diffColors[diff] || 'var(--warn)') + ';">' + diff + '</div>' +
+        '<div class="me-card-title">' + P002Security.escapeHtml(m.manifest.title || m.folderName) + '</div>' +
+        '<div class="me-card-meta">' + (m.manifest.sections?.length || 0) + ' sections · ' + (m.manifest.estimated_hours || 0) + 'h</div>' +
+      '</div>' +
+      '<div class="me-card-arrow">›</div>';
+    el.onclick = () => openModuleDetail(m);
     return el;
   }
 
-  async function openFile(path, name) {
-    const safePath = P002Security.sanitizePath(path);
-    if (!safePath) { toast('Invalid path', 'err'); return; }
-    openFilePath = safePath;
+  // ── MODULE DETAIL ──────────────────────────────────────────────
+  async function openModuleDetail(m) {
+    meCurrentModule = m;
+    showMeView('module');
 
-    try {
-      const data = await P002Api.adminGetFile(safePath);
-      const content = data.content;
-      const isSection = name.match(/^section_\d+\.json$/) && content.includes('"content"');
+    const manifest = m.manifest;
+    document.getElementById('meModuleIcon').textContent = manifest.icon || '📚';
+    document.getElementById('meModuleCat').textContent = (manifest.category || 'Other').toUpperCase();
+    document.getElementById('meModuleTitle').textContent = manifest.title || m.folderName;
+    document.getElementById('meModuleSections').textContent = manifest.sections?.length || 0;
+    document.getElementById('meModuleHours').textContent = (manifest.estimated_hours || 0) + 'h';
+    document.getElementById('meModuleFlags').textContent = (manifest.sections || []).filter(s => s.has_flag).length;
 
-      if (isSection) {
-        // Block editor
-        try {
-          const parsed = JSON.parse(content);
-          if (parsed.meta && parsed.content && Array.isArray(parsed.content)) {
-            blockSections = parsed;
-            blockDirty = false;
-            openBlockEditor(safePath);
-            return;
-          }
-        } catch(e) {}
-      }
+    renderSectionList();
+  }
 
-      // Raw editor
-      openRawEditor(safePath, content);
-    } catch(e) {
-      toast('Failed to load: ' + e.message, 'err');
+  function renderSectionList() {
+    const list = document.getElementById('meSectionList');
+    list.innerHTML = '';
+    const sections = meCurrentModule.manifest.sections || [];
+    if (!sections.length) {
+      list.innerHTML = '<div class="loading-center">No sections yet.</div>';
+      return;
     }
+    sections.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.className = 'me-section-row';
+      const qCount = 0; // would need to load section to know
+      row.innerHTML =
+        '<div class="me-sec-num">' + String(i+1).padStart(2,'0') + '</div>' +
+        '<div class="me-sec-info">' +
+          '<div class="me-sec-title">' + P002Security.escapeHtml(s.title || s.file) + '</div>' +
+          '<div class="me-sec-meta">' + (s.minutes || '?') + ' min · ' + (s.difficulty || '') + '</div>' +
+        '</div>' +
+        '<div class="me-sec-badges">' +
+          '<div class="me-sec-badge ' + (s.has_flag ? 'flag' : '') + '">' + (s.has_flag ? '🏴' : '') + '</div>' +
+        '</div>' +
+        '<div class="me-sec-arrow">›</div>';
+      row.onclick = () => openSectionEditor(s, i);
+      list.appendChild(row);
+    });
   }
 
-  async function deleteFile(path) {
-    if (!confirm('Delete ' + path + '?')) return;
-    try {
-      await P002Api.deleteFile(path);
-      toast('Deleted', 'ok');
-      loadFiles();
-    } catch(e) {
-      toast('Delete failed: ' + e.message, 'err');
-    }
-  }
-
-  async function deleteFolder(folderName) {
-    if (!confirm('Delete entire folder "' + folderName + '" and all its files? This cannot be undone.')) return;
-    try {
-      const files = await P002Api.listBucket(folderName);
-      if (!files.length) {
-        toast('Folder is empty or already deleted', 'warn');
-        loadFiles();
-        return;
-      }
-      let deleted = 0;
-      for (const f of files) {
-        try {
-          await P002Api.deleteFile(folderName + '/' + f.name);
-          deleted++;
-        } catch(e) {
-          console.warn('Failed to delete', f.name, e.message);
-        }
-      }
-      toast('Deleted ' + deleted + ' files from ' + folderName, 'ok');
-      loadFiles();
-    } catch(e) {
-      toast('Delete failed: ' + e.message, 'err');
-    }
-  }
-
-  function showFilesView(which) {
-    document.getElementById('filesListView').style.display = which === 'list' ? 'flex' : 'none';
-    document.getElementById('blockEditorView').style.display = which === 'block' ? 'flex' : 'none';
-    document.getElementById('rawEditorView').style.display = which === 'raw' ? 'flex' : 'none';
-  }
-
-  // ── BLOCK EDITOR ──────────────────────────────────────────────
-  function openBlockEditor(path) {
-    showFilesView('block');
-    document.getElementById('beFilename').textContent = path;
-    document.getElementById('beUnsaved').style.display = 'none';
+  async function openSectionEditor(sectionMeta, idx) {
+    meCurrentSection = { ...sectionMeta, idx };
+    showMeView('section');
+    meBlockTab = 'blocks';
+    document.getElementById('meSectionFilename').textContent = meCurrentModule.folderName + '/' + sectionMeta.file;
+    document.getElementById('meSectionTitle').textContent = sectionMeta.title || sectionMeta.file;
+    document.getElementById('meSectionUnsaved').style.display = 'none';
     selectedBlockIdx = null;
-    renderBlocks();
-  }
-
-  function closeBlockEditor() {
-    if (blockDirty && !confirm('Discard unsaved changes?')) return;
-    blockDirty = false;
     blockSections = null;
-    closeAiDrawer();
-    closeSectionChat();
-    showFilesView('list');
+    blockDirty = false;
+
+    switchBlockTab('blocks');
+
+    // Load section JSON
+    const path = meCurrentModule.folderName + '/' + sectionMeta.file;
+    try {
+      const data = await P002Api.adminGetFile(path);
+      const parsed = JSON.parse(data.content);
+      blockSections = parsed;
+      openFilePath = path;
+      renderMeBlocks();
+    } catch(e) {
+      toast('Failed to load section: ' + e.message, 'err');
+    }
   }
 
-  function renderBlocks() {
-    const container = document.getElementById('beBlocks');
+  function switchBlockTab(tab) {
+    meBlockTab = tab;
+    document.querySelectorAll('.me-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.getElementById('meTabBlocks').style.display = tab === 'blocks' ? 'flex' : 'none';
+    document.getElementById('meTabQuestions').style.display = tab === 'questions' ? 'flex' : 'none';
+    document.getElementById('meTabChat').style.display = tab === 'chat' ? 'flex' : 'none';
+    document.getElementById('meTabRaw').style.display = tab === 'raw' ? 'flex' : 'none';
+
+    if (tab === 'questions' && blockSections) renderMeQuestions();
+    if (tab === 'raw' && blockSections) {
+      document.getElementById('meRawTextarea').value = JSON.stringify(blockSections, null, 2);
+      updateMeRawStatus();
+    }
+  }
+
+  // ── BLOCKS TAB ────────────────────────────────────────────────
+  function renderMeBlocks() {
+    const container = document.getElementById('meBlockList');
     container.innerHTML = '';
     if (!blockSections?.content) return;
 
-    // Insert zone at the top
-    container.appendChild(buildInsertZone(0));
-
+    container.appendChild(buildMeInsertZone(0));
     blockSections.content.forEach((block, i) => {
-      container.appendChild(buildBlockEl(block, i));
-      container.appendChild(buildInsertZone(i + 1));
+      container.appendChild(buildMeBlockEl(block, i));
+      container.appendChild(buildMeInsertZone(i + 1));
     });
   }
 
-  function buildInsertZone(afterIdx) {
+  function buildMeInsertZone(afterIdx) {
     const el = document.createElement('div');
     el.className = 'block-insert';
-    el.innerHTML = '<div class="block-insert-line"></div><button class="block-insert-btn" onclick="P002Admin.insertBlockAt(' + afterIdx + ')">+ insert</button><div class="block-insert-line"></div>';
+    el.innerHTML = '<div class="block-insert-line"></div><button class="block-insert-btn" onclick="P002Admin.meInsertBlockAt(' + afterIdx + ')">+ insert</button><div class="block-insert-line"></div>';
     return el;
   }
 
-  function buildBlockEl(block, idx) {
+  function buildMeBlockEl(block, idx) {
     const el = document.createElement('div');
-    el.className = 'content-block' + (idx === selectedBlockIdx ? ' selected' : '');
+    const isSelected = idx === selectedBlockIdx;
+    el.className = 'me-block' + (isSelected ? ' selected' : '') + (block.type === 'callout' ? ' callout' : '') + (block.type === 'heading' ? ' heading' : '');
     el.dataset.idx = idx;
-    el.draggable = true;
 
-    const typeLabel = block.type + (block.lang ? ' · ' + block.lang : '');
-    const contentClass = block.type === 'heading' ? 'heading' : block.type === 'code' ? 'code' : block.type === 'callout' ? 'callout' : '';
-    const preview = block.text ? block.text.slice(0, 120) + (block.text.length > 120 ? '...' : '') : '';
-
+    const preview = block.text ? block.text.slice(0, 100) + (block.text.length > 100 ? '...' : '') : '';
     el.innerHTML =
-      '<div class="cb-type-row">' +
-        '<div class="cb-type">' + P002Security.escapeHtml(typeLabel) + (idx === selectedBlockIdx ? ' <span class="cb-type-tag">● selected</span>' : '') + '</div>' +
-        '<div class="cb-drag-handle" title="Drag to reorder">⠿</div>' +
-      '</div>' +
-      '<div class="cb-content ' + contentClass + '">' + P002Security.escapeHtml(preview) + '</div>';
+      '<div class="me-block-type">' + (block.type + (block.lang ? ' · ' + block.lang : '')) + (isSelected ? ' <span>● selected</span>' : '') + '<span class="me-block-drag">⠿</span></div>' +
+      '<div class="me-block-preview">' + P002Security.escapeHtml(preview) + '</div>';
 
-    // Click to select
-    el.onclick = (e) => {
-      if (e.target.classList.contains('cb-drag-handle')) return;
-      selectBlock(idx);
-    };
+    el.onclick = () => selectMeBlock(idx);
 
-    // Drag handlers
-    el.addEventListener('dragstart', e => {
-      dragSrcIdx = idx;
-      el.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    });
+    el.draggable = true;
+    el.addEventListener('dragstart', e => { dragSrcIdx = idx; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
     el.addEventListener('dragend', () => el.classList.remove('dragging'));
-    el.addEventListener('dragover', e => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      el.classList.add('drag-over');
-    });
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
     el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
     el.addEventListener('drop', e => {
-      e.preventDefault();
-      el.classList.remove('drag-over');
+      e.preventDefault(); el.classList.remove('drag-over');
       if (dragSrcIdx !== null && dragSrcIdx !== idx) {
-        const blocks = blockSections.content;
-        const [moved] = blocks.splice(dragSrcIdx, 1);
-        blocks.splice(idx, 0, moved);
-        blockDirty = true;
-        document.getElementById('beUnsaved').style.display = 'block';
-        renderBlocks();
+        const [moved] = blockSections.content.splice(dragSrcIdx, 1);
+        blockSections.content.splice(idx, 0, moved);
+        markMeDirty();
+        renderMeBlocks();
       }
     });
 
-    // Show popup if selected
-    if (idx === selectedBlockIdx) {
-      const popup = document.createElement('div');
-      popup.className = 'block-popup';
-      popup.innerHTML =
-        '<button class="bp-btn primary" onclick="P002Admin.blockAction(\'expand\')">Expand</button>' +
-        '<button class="bp-btn" onclick="P002Admin.blockAction(\'rework\')">Rework</button>' +
-        '<button class="bp-btn" onclick="P002Admin.blockAction(\'example\')">Example</button>' +
-        '<button class="bp-btn" onclick="P002Admin.blockAction(\'split\')">Split</button>' +
-        '<button class="bp-btn danger" onclick="P002Admin.deleteBlock(' + idx + ')">🗑</button>';
-      el.appendChild(popup);
-    }
-
     return el;
   }
 
-  function selectBlock(idx) {
-    if (selectedBlockIdx === idx) {
-      selectedBlockIdx = null;
-    } else {
-      selectedBlockIdx = idx;
+  function selectMeBlock(idx) {
+    selectedBlockIdx = selectedBlockIdx === idx ? null : idx;
+    renderMeBlocks();
+    // Show/hide tray
+    const tray = document.getElementById('meBlockTray');
+    tray.style.display = selectedBlockIdx !== null ? 'flex' : 'none';
+    if (selectedBlockIdx !== null) {
+      setTimeout(() => {
+        const selected = document.querySelector('.me-block.selected');
+        if (selected) selected.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
     }
-    renderBlocks();
-    // Scroll selected block into view
-    setTimeout(() => {
-      const selected = document.querySelector('.content-block.selected');
-      if (selected) selected.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 50);
   }
 
-  function insertBlockAt(idx) {
-    // Show type picker
-    const container = document.getElementById('beBlocks');
-    // Remove any existing picker
+  function meInsertBlockAt(idx) {
     document.querySelectorAll('.block-type-picker').forEach(p => p.remove());
-
-    const zones = container.querySelectorAll('.block-insert');
+    const zones = document.getElementById('meBlockList').querySelectorAll('.block-insert');
     const zone = zones[idx];
     if (!zone) return;
-
     const picker = document.createElement('div');
     picker.className = 'block-type-picker';
-    picker.style.position = 'relative';
-    picker.style.bottom = 'auto';
-    picker.style.left = 'auto';
-    picker.style.transform = 'none';
-    picker.style.display = 'flex';
-    picker.innerHTML =
-      '<button class="btp-btn" onclick="P002Admin.doInsertBlock('+idx+',\'heading\')">Heading</button>' +
-      '<button class="btp-btn" onclick="P002Admin.doInsertBlock('+idx+',\'body\')">Body</button>' +
-      '<button class="btp-btn" onclick="P002Admin.doInsertBlock('+idx+',\'code\')">Code</button>' +
-      '<button class="btp-btn" onclick="P002Admin.doInsertBlock('+idx+',\'callout\')">Callout</button>' +
-      '<button class="btp-btn" onclick="document.querySelectorAll(\'.block-type-picker\').forEach(p=>p.remove())">✕</button>';
+    picker.style.cssText = 'position:relative;bottom:auto;left:auto;transform:none;display:flex;';
+    picker.innerHTML = [
+      '<button class="btp-btn" onclick="P002Admin.meDoInsertBlock(' + idx + ',&quot;heading&quot;)">Heading</button>',
+      '<button class="btp-btn" onclick="P002Admin.meDoInsertBlock(' + idx + ',&quot;body&quot;)">Body</button>',
+      '<button class="btp-btn" onclick="P002Admin.meDoInsertBlock(' + idx + ',&quot;code&quot;)">Code</button>',
+      '<button class="btp-btn" onclick="P002Admin.meDoInsertBlock(' + idx + ',&quot;callout&quot;)">Callout</button>',
+      '<button class="btp-btn" onclick="this.closest(\".block-type-picker\").remove()">✕</button>'
+    ].join('');
     zone.appendChild(picker);
   }
 
-  function doInsertBlock(idx, type) {
+  function meDoInsertBlock(idx, type) {
     document.querySelectorAll('.block-type-picker').forEach(p => p.remove());
     const newBlock = { type, text: type === 'heading' ? 'New Heading' : type === 'code' ? '// code here' : 'New ' + type + ' block.' };
     if (type === 'code') newBlock.lang = 'text';
     blockSections.content.splice(idx, 0, newBlock);
-    blockDirty = true;
-    document.getElementById('beUnsaved').style.display = 'block';
     selectedBlockIdx = idx;
-    renderBlocks();
+    markMeDirty();
+    renderMeBlocks();
   }
 
-  function deleteBlock(idx) {
-    if (!confirm('Delete this block?')) return;
-    blockSections.content.splice(idx, 1);
-    selectedBlockIdx = null;
-    blockDirty = true;
-    document.getElementById('beUnsaved').style.display = 'block';
-    renderBlocks();
-  }
-
-  async function blockAction(action) {
+  function meDeleteBlock() {
     if (selectedBlockIdx === null) return;
+    if (!confirm('Delete this block?')) return;
+    blockSections.content.splice(selectedBlockIdx, 1);
+    selectedBlockIdx = null;
+    document.getElementById('meBlockTray').style.display = 'none';
+    markMeDirty();
+    renderMeBlocks();
+  }
+
+  async function meBlockAction(action) {
+    if (selectedBlockIdx === null || !blockSections) return;
     const block = blockSections.content[selectedBlockIdx];
-    const labels = { expand: 'Expand', rework: 'Rework', example: 'Add Example', split: 'Split' };
+    const labels = { expand: 'Expand', rework: 'Rework', example: 'Example', split: 'Split' };
     const prompts = {
-      expand: 'Expand this content block with more depth and detail. Return only the new text content, no JSON wrapper.',
-      rework: 'Rework this content block — different explanation, same concept. Return only the new text content.',
-      example: 'Add a concrete real-world example to illustrate this. Return only the example text.',
-      split: 'This block is too long. Split it into two shorter blocks. Return as JSON array: [{"type":"body","text":"..."},{"type":"body","text":"..."}]'
+      expand: 'Expand this content block with more depth. Return only the new text.',
+      rework: 'Rework this block — different explanation, same concept. Return only the new text.',
+      example: 'Add a concrete real-world example. Return only the example text.',
+      split: 'Split into two shorter blocks. Return JSON array: [{"type":"body","text":"..."},{"type":"body","text":"..."}]'
     };
 
-    openAiDrawer(labels[action], block.text);
-    document.getElementById('drawerTyping').style.display = 'flex';
-    document.getElementById('drawerResponse').textContent = '';
-    document.getElementById('drawerActions').style.display = 'none';
+    // Show AI panel
+    document.getElementById('meAiPanel').style.display = 'flex';
+    document.getElementById('meAiMode').textContent = labels[action];
+    document.getElementById('meAiResponse').textContent = '···';
+    document.getElementById('meAiApplyBtn').style.display = 'none';
+    drawerPendingText = null;
 
-    const sp = 'You are a cybersecurity curriculum editor. Edit content blocks for an educational reader platform. Section: "' + (blockSections?.meta?.title || '') + '". ' + (blockSections?.ai_context || '') + ' Be concise and educational.';
-    const msg = prompts[action] + '\n\nBlock content: "' + block.text + '"';
+    const sp = 'You are a curriculum editor. Edit content blocks for an educational reader. Section: "' + (blockSections?.meta?.title || '') + '". Be concise and educational.';
+    const msg = prompts[action] + '\n\nBlock: "' + block.text + '"';
 
     try {
       const reply = await P002Api.callClaude(sp, [{ role: 'user', content: msg }], null, 'haiku');
-      document.getElementById('drawerTyping').style.display = 'none';
-      document.getElementById('drawerResponse').innerHTML = formatResponse(reply);
-      document.getElementById('drawerActions').style.display = 'flex';
+      document.getElementById('meAiResponse').innerHTML = formatResponse(reply);
+      document.getElementById('meAiApplyBtn').style.display = 'block';
       drawerPendingText = reply;
       drawerHistory = [{ role: 'user', content: msg }, { role: 'assistant', content: reply }];
     } catch(e) {
-      document.getElementById('drawerTyping').style.display = 'none';
-      document.getElementById('drawerResponse').textContent = 'Error: ' + e.message;
+      document.getElementById('meAiResponse').textContent = 'Error: ' + e.message;
     }
   }
 
-  function applyDrawerEdit() {
-    if (selectedBlockIdx === null || !drawerPendingText) return;
-    const block = blockSections.content[selectedBlockIdx];
-
-    // Check if response is a JSON array (split action)
-    try {
-      const parsed = JSON.parse(drawerPendingText.trim());
-      if (Array.isArray(parsed)) {
-        blockSections.content.splice(selectedBlockIdx, 1, ...parsed);
-        toast('Block split into ' + parsed.length, 'ok');
-        selectedBlockIdx = null;
-        blockDirty = true;
-        document.getElementById('beUnsaved').style.display = 'block';
-        closeAiDrawer();
-        renderBlocks();
-        return;
-      }
-    } catch(e) {}
-
-    block.text = drawerPendingText;
-    // Mark updated
-    blockDirty = true;
-    document.getElementById('beUnsaved').style.display = 'block';
-    closeAiDrawer();
-    renderBlocks();
-    // Highlight updated block
-    setTimeout(() => {
-      const blocks = document.querySelectorAll('.content-block');
-      if (blocks[selectedBlockIdx]) blocks[selectedBlockIdx].classList.add('updated');
-    }, 50);
-    toast('Block updated', 'ok');
-    drawerPendingText = null;
-    selectedBlockIdx = null;
-  }
-
-  async function sendDrawerMessage() {
-    const input = document.getElementById('drawerInput');
+  async function meAiSend() {
+    const input = document.getElementById('meAiInput');
     const text = input.value.trim();
     if (!text) return;
     input.value = '';
     drawerHistory.push({ role: 'user', content: text });
-    document.getElementById('drawerTyping').style.display = 'flex';
-    document.getElementById('drawerActions').style.display = 'none';
-    const sp = 'You are a cybersecurity curriculum editor. Edit content blocks for an educational reader. Section: "' + (blockSections?.meta?.title || '') + '".';
+    document.getElementById('meAiResponse').textContent = '···';
+    const sp = 'You are a curriculum editor. Section: "' + (blockSections?.meta?.title || '') + '".';
     try {
       const reply = await P002Api.callClaude(sp, drawerHistory.slice(-4), null, 'haiku');
-      document.getElementById('drawerTyping').style.display = 'none';
-      document.getElementById('drawerResponse').innerHTML += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">' + formatResponse(reply) + '</div>';
-      document.getElementById('drawerActions').style.display = 'flex';
+      document.getElementById('meAiResponse').innerHTML += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">' + formatResponse(reply) + '</div>';
       drawerPendingText = reply;
       drawerHistory.push({ role: 'assistant', content: reply });
+      document.getElementById('meAiApplyBtn').style.display = 'block';
     } catch(e) {
-      document.getElementById('drawerTyping').style.display = 'none';
+      document.getElementById('meAiResponse').textContent = 'Error: ' + e.message;
     }
   }
 
-  function openAiDrawer(mode, quote) {
-    document.getElementById('aiDrawer').style.display = 'block';
-    document.getElementById('drawerMode').textContent = mode;
-    document.getElementById('drawerQuote').textContent = '"' + (quote||'').slice(0,100) + (quote?.length > 100 ? '...' : '') + '"';
-    drawerHistory = [];
+  function meAiApply() {
+    if (selectedBlockIdx === null || !drawerPendingText) return;
+    try {
+      const parsed = JSON.parse(drawerPendingText.trim());
+      if (Array.isArray(parsed)) {
+        blockSections.content.splice(selectedBlockIdx, 1, ...parsed);
+        toast('Split into ' + parsed.length + ' blocks', 'ok');
+        selectedBlockIdx = null;
+        document.getElementById('meBlockTray').style.display = 'none';
+        document.getElementById('meAiPanel').style.display = 'none';
+        markMeDirty();
+        renderMeBlocks();
+        return;
+      }
+    } catch(e) {}
+    blockSections.content[selectedBlockIdx].text = drawerPendingText;
+    markMeDirty();
+    document.getElementById('meAiPanel').style.display = 'none';
+    renderMeBlocks();
+    toast('Block updated', 'ok');
     drawerPendingText = null;
   }
 
-  function closeAiDrawer() {
-    document.getElementById('aiDrawer').style.display = 'none';
-    drawerPendingText = null;
-    drawerHistory = [];
+  // ── QUESTIONS TAB ─────────────────────────────────────────────
+  function renderMeQuestions() {
+    const list = document.getElementById('meQuestionList');
+    list.innerHTML = '';
+    const qs = blockSections?.knowledge_check?.questions || [];
+    const source = blockSections?.knowledge_check?.source || 'generated';
+
+    document.getElementById('meQMeta').textContent = qs.length + ' questions · ' + source;
+
+    if (!qs.length) {
+      list.innerHTML = '<div class="loading-center">No questions — tap Regenerate below.</div>';
+      return;
+    }
+
+    qs.forEach((q, i) => {
+      const row = document.createElement('div');
+      row.className = 'me-q-row';
+      const typeColors = { mc: '#6495ed', tf: '#4ade80', sa: '#ff9f43' };
+      const typeLabels = { mc: 'MC', tf: 'T/F', sa: 'SA' };
+      row.innerHTML =
+        '<div class="me-q-badge" style="color:' + (typeColors[q.type] || '#666') + ';border-color:' + (typeColors[q.type] || '#666') + '33;">' + (typeLabels[q.type] || q.type) + '</div>' +
+        '<div class="me-q-info">' +
+          '<div class="me-q-num">Q' + (i+1) + '</div>' +
+          '<div class="me-q-text">' + P002Security.escapeHtml(q.question) + '</div>' +
+        '</div>' +
+        '<div class="me-q-arrow">›</div>';
+      row.onclick = () => openQuestionEdit(i);
+      list.appendChild(row);
+    });
   }
 
-  // Section chat
-  function openSectionChat() {
-    document.getElementById('sectionChat').style.display = 'flex';
-    document.getElementById('scMsgs').innerHTML = '';
-    scHistory = [];
-    addScMsg('ai', 'Ready. Ask me to rework, deepen, add content, generate a challenge, or restructure this section.');
+  function openQuestionEdit(idx) {
+    const q = blockSections.knowledge_check.questions[idx];
+    document.getElementById('meQEditIdx').value = idx;
+    document.getElementById('meQEditTextarea').value = JSON.stringify(q, null, 2);
+    document.getElementById('meQEditModal').style.display = 'flex';
   }
 
-  function closeSectionChat() {
-    document.getElementById('sectionChat').style.display = 'none';
-    scHistory = [];
+  function saveQuestionEdit() {
+    const idx = parseInt(document.getElementById('meQEditIdx').value);
+    try {
+      const parsed = JSON.parse(document.getElementById('meQEditTextarea').value);
+      blockSections.knowledge_check.questions[idx] = parsed;
+      closeModal('meQEditModal');
+      markMeDirty();
+      renderMeQuestions();
+      toast('Question updated', 'ok');
+    } catch(e) {
+      toast('Invalid JSON: ' + e.message, 'err');
+    }
   }
 
-  async function sendScMessage() {
-    const input = document.getElementById('scInput');
+  async function regenerateQuestions() {
+    if (!blockSections) return;
+    toast('Regenerating questions...', 'ok');
+    const sp = 'You are a curriculum developer. Generate knowledge check questions for this section. Return JSON only: {"source":"generated","questions":[...]}. Each question: {type:"mc"|"tf"|"sa", question:"...", options(mc only):["A. ...","B. ...","C. ...","D. ..."], answer:"A"|true|false, explanation:"...", sample_answer(sa only):"...", key_points(sa only):[...]}. Generate 5 questions mixing all types. 1 sentence explanations only.';
+    const msg = 'Section: "' + blockSections.meta?.title + '"\n\n' + (blockSections.content || []).map(b => b.text || '').join(' ').slice(0, 2000);
+    try {
+      const reply = await P002Api.callClaude(sp, [{ role: 'user', content: msg }], null, 'haiku');
+      const clean = reply.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      const parsed = JSON.parse(clean);
+      blockSections.knowledge_check = parsed;
+      markMeDirty();
+      renderMeQuestions();
+      toast('Questions regenerated', 'ok');
+    } catch(e) {
+      toast('Failed: ' + e.message, 'err');
+    }
+  }
+
+  // ── SECTION CHAT TAB ─────────────────────────────────────────
+  async function meChatSend() {
+    const input = document.getElementById('meChatInput');
     const text = input.value.trim();
     if (!text) return;
     input.value = '';
-    scChip(text);
-  }
-
-  async function scChip(text) {
-    addScMsg('user', text);
-    scHistory.push({ role: 'user', content: text });
-    const sp = 'You are a cybersecurity curriculum editor helping to improve a section. Section title: "' + (blockSections?.meta?.title || '') + '". Content has ' + (blockSections?.content?.length || 0) + ' blocks. Context: ' + (blockSections?.ai_context || '') + '. Provide specific, actionable suggestions. Keep responses concise.';
-    const typingEl = addScMsg('ai', '···');
+    meChatHistory.push({ role: 'user', content: text });
+    addMeChatMsg('user', text);
+    const sp = 'You are a curriculum editor. Section: "' + (blockSections?.meta?.title || '') + '". ' + (blockSections?.ai_context || '') + ' Be concise and actionable.';
+    const typingEl = addMeChatMsg('ai', '···');
     try {
-      const reply = await P002Api.callClaude(sp, scHistory.slice(-4), null, 'haiku');
+      const reply = await P002Api.callClaude(sp, meChatHistory.slice(-4), null, 'haiku');
       typingEl.innerHTML = formatResponse(reply);
-      scHistory.push({ role: 'assistant', content: reply });
+      meChatHistory.push({ role: 'assistant', content: reply });
     } catch(e) {
       typingEl.textContent = 'Error: ' + e.message;
     }
   }
 
-  function addScMsg(role, text) {
-    const msgs = document.getElementById('scMsgs');
+  function addMeChatMsg(role, text) {
+    const msgs = document.getElementById('meChatMsgs');
     const div = document.createElement('div');
-    div.className = 'sc-' + role;
+    div.className = 'sc-' + (role === 'ai' ? 'ai' : 'user');
     div.innerHTML = formatResponse(text);
     msgs.appendChild(div);
     msgs.scrollTop = msgs.scrollHeight;
     return div;
   }
 
-  async function deepenSection() {
-    openSectionChat();
-    await scChip('This section needs more technical depth. What specific content should I add or expand?');
+  // ── RAW TAB ──────────────────────────────────────────────────
+  function updateMeRawStatus() {
+    const text = document.getElementById('meRawTextarea').value;
+    document.getElementById('meRawLines').textContent = text.split('\n').length + ' lines';
+    document.getElementById('meRawSize').textContent = (new Blob([text]).size / 1024).toFixed(1) + ' KB';
   }
 
-  function addBlock() {
-    insertBlockAt(blockSections.content.length);
+  function onMeRawChange() {
+    blockDirty = true;
+    updateMeRawStatus();
+    document.getElementById('meSectionUnsaved').style.display = 'block';
   }
 
-  async function saveBlockEditor() {
+  function formatMeRaw() {
+    const ta = document.getElementById('meRawTextarea');
+    try {
+      ta.value = JSON.stringify(JSON.parse(ta.value), null, 2);
+      updateMeRawStatus();
+      toast('Formatted', 'ok');
+    } catch(e) { toast('Invalid JSON', 'err'); }
+  }
+
+  function validateMeRaw() {
+    const text = document.getElementById('meRawTextarea').value;
+    try {
+      JSON.parse(text);
+      toast('✓ Valid JSON', 'ok');
+    } catch(e) {
+      toast('✗ ' + e.message, 'err');
+    }
+  }
+
+  // ── SAVE ─────────────────────────────────────────────────────
+  async function saveSectionEditor() {
     if (!openFilePath || !blockSections) return;
-    const btn = document.getElementById('beSaveBtn');
+
+    // If on raw tab, sync raw textarea back to blockSections
+    if (meBlockTab === 'raw') {
+      try {
+        blockSections = JSON.parse(document.getElementById('meRawTextarea').value);
+      } catch(e) {
+        toast('Invalid JSON in raw editor', 'err');
+        return;
+      }
+    }
+
+    const btn = document.getElementById('meSaveBtn');
     btn.textContent = 'Saving...';
     btn.disabled = true;
     try {
       await P002Api.adminSaveFile(openFilePath, JSON.stringify(blockSections, null, 2));
       blockDirty = false;
-      document.getElementById('beUnsaved').style.display = 'none';
+      document.getElementById('meSectionUnsaved').style.display = 'none';
       toast('Saved', 'ok');
     } catch(e) {
       toast('Save failed: ' + e.message, 'err');
@@ -1009,109 +1025,80 @@ STRICT RULES — you MUST follow these:
     btn.disabled = false;
   }
 
-  // ── RAW EDITOR ────────────────────────────────────────────────
-  function openRawEditor(path, content) {
-    showFilesView('raw');
-    openFilePath = path;
-    rawDirty = false;
-    document.getElementById('rawFilename').textContent = path;
-    document.getElementById('rawValidateStatus').style.display = 'none';
-    const textarea = document.getElementById('rawTextarea');
+  function markMeDirty() {
+    blockDirty = true;
+    document.getElementById('meSectionUnsaved').style.display = 'block';
+  }
+
+  // ── EDIT MODULE METADATA ──────────────────────────────────────
+  function openEditModuleMeta() {
+    if (!meCurrentModule) return;
+    const manifest = meCurrentModule.manifest;
+    document.getElementById('meEditTitle').value = manifest.title || '';
+    document.getElementById('meEditCategory').value = manifest.category || '';
+    document.getElementById('meEditDifficulty').value = manifest.difficulty || 'beginner';
+
+    // Icon picker
+    const icons = ['🔒','💻','🛡','⚡','🌐','🔧','📡','💾','🔍','🏴','📚','💉','🧩','⚙️','🖥'];
+    const picker = document.getElementById('meEditIconPicker');
+    picker.innerHTML = '';
+    icons.forEach(icon => {
+      const btn = document.createElement('button');
+      btn.className = 'me-icon-opt' + (icon === (manifest.icon || '📚') ? ' selected' : '');
+      btn.textContent = icon;
+      btn.onclick = () => { document.querySelectorAll('.me-icon-opt').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); };
+      picker.appendChild(btn);
+    });
+
+    document.getElementById('meEditKey').textContent = manifest.module_key || meCurrentModule.folderName;
+    showMeView('edit-meta');
+  }
+
+  async function saveModuleMeta() {
+    if (!meCurrentModule) return;
+    const manifest = meCurrentModule.manifest;
+    manifest.title = document.getElementById('meEditTitle').value.trim();
+    manifest.category = document.getElementById('meEditCategory').value.trim();
+    manifest.difficulty = document.getElementById('meEditDifficulty').value;
+    const selectedIcon = document.querySelector('.me-icon-opt.selected');
+    if (selectedIcon) manifest.icon = selectedIcon.textContent;
+
     try {
-      textarea.value = JSON.stringify(JSON.parse(content), null, 2);
-    } catch(e) {
-      textarea.value = content;
-    }
-    updateRawStatus();
-  }
-
-  function closeRawEditor() {
-    if (rawDirty && !confirm('Discard unsaved changes?')) return;
-    rawDirty = false;
-    showFilesView('list');
-  }
-
-  function onRawChange() {
-    rawDirty = true;
-    updateRawStatus();
-    document.getElementById('rawValidateStatus').style.display = 'none';
-  }
-
-  function updateRawStatus() {
-    const text = document.getElementById('rawTextarea').value;
-    document.getElementById('rawLines').textContent = text.split('\n').length + ' lines';
-    document.getElementById('rawSize').textContent = (new Blob([text]).size / 1024).toFixed(1) + ' KB';
-  }
-
-  function validateRaw() {
-    const text = document.getElementById('rawTextarea').value;
-    const status = document.getElementById('rawValidateStatus');
-    status.style.display = 'block';
-    try {
-      JSON.parse(text);
-      status.textContent = '✓ Valid JSON';
-      status.className = 'raw-validate-status ok';
-    } catch(e) {
-      status.textContent = '✗ ' + e.message;
-      status.className = 'raw-validate-status err';
-    }
-  }
-
-  function formatRaw() {
-    const textarea = document.getElementById('rawTextarea');
-    try {
-      textarea.value = JSON.stringify(JSON.parse(textarea.value), null, 2);
-      updateRawStatus();
-      toast('Formatted', 'ok');
-    } catch(e) {
-      toast('Invalid JSON', 'err');
-    }
-  }
-
-  function handleRawKey(e) {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const s = e.target.selectionStart;
-      e.target.value = e.target.value.substring(0, s) + '  ' + e.target.value.substring(e.target.selectionEnd);
-      e.target.selectionStart = e.target.selectionEnd = s + 2;
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveRaw(); }
-  }
-
-  async function saveRaw() {
-    if (!openFilePath) return;
-    const text = document.getElementById('rawTextarea').value;
-    try {
-      JSON.parse(text); // validate before save
-    } catch(e) {
-      toast('Invalid JSON — fix errors before saving', 'err');
-      return;
-    }
-    try {
-      await P002Api.adminSaveFile(openFilePath, text);
-      rawDirty = false;
-      toast('Saved', 'ok');
+      await P002Api.adminSaveFile(meCurrentModule.folderName + '/manifest.json', JSON.stringify(manifest, null, 2));
+      toast('Module updated', 'ok');
+      showMeView('module');
+      document.getElementById('meModuleTitle').textContent = manifest.title;
+      document.getElementById('meModuleIcon').textContent = manifest.icon || '📚';
+      document.getElementById('meModuleCat').textContent = (manifest.category || '').toUpperCase();
     } catch(e) {
       toast('Save failed: ' + e.message, 'err');
     }
   }
 
-  // ── ZIP UPLOAD ────────────────────────────────────────────────
-  function showUploadZipModal() {
-    document.getElementById('zipModal').style.display = 'flex';
-    document.getElementById('zipOutput').style.display = 'none';
+  async function deleteCurrentModule() {
+    if (!meCurrentModule) return;
+    if (!confirm('Delete "' + meCurrentModule.manifest.title + '" and all its files? Cannot be undone.')) return;
+    await deleteFolder(meCurrentModule.folderName);
+    showMeView('list');
+    loadModuleEditor();
   }
 
-  async function handleZipUpload() {
-    const fileInput = document.getElementById('zipFileInput');
+  // ── ZIP IMPORT ────────────────────────────────────────────────
+  function showModuleZipImport() {
+    document.getElementById('meZipModal').style.display = 'flex';
+    document.getElementById('meZipOutput').style.display = 'none';
+  }
+
+  async function handleModuleZipImport() {
+    const fileInput = document.getElementById('meZipFileInput');
     const file = fileInput.files[0];
     if (!file) { toast('Select a ZIP first', 'err'); return; }
 
-    const output = document.getElementById('zipOutput');
-    const btn = document.getElementById('btnUploadZip');
+    const output = document.getElementById('meZipOutput');
+    const btn = document.getElementById('meBtnUploadZip');
     output.style.display = 'block';
-    output.innerHTML = '<span style="color:var(--orange);">Processing ZIP...</span>';
-    btn.disabled = true; btn.textContent = 'Processing...';
+    output.innerHTML = '<span style="color:var(--orange);">Processing...</span>';
+    btn.disabled = true;
 
     try {
       const result = await P002Security.processLessonZip(file);
@@ -1133,16 +1120,49 @@ STRICT RULES — you MUST follow these:
         }
         output.innerHTML = html;
       }
-      html += '<span style="color:var(--text-muted);">\nDone: ' + ok + ' uploaded, ' + fail + ' failed</span>';
+      html += '\n<span style="color:var(--text-muted);">Done: ' + ok + ' uploaded, ' + fail + ' failed</span>';
       output.innerHTML = html;
-      if (ok > 0) { toast(ok + ' file(s) uploaded', 'ok'); loadFiles(); }
+      if (ok > 0) { toast(ok + ' files imported', 'ok'); loadModuleEditor(); }
     } catch(e) {
       output.innerHTML = '<span style="color:var(--accent);">Error: ' + P002Security.escapeHtml(e.message) + '</span>';
     } finally {
-      btn.disabled = false; btn.textContent = '▶ Upload';
+      btn.disabled = false; btn.textContent = '▶ Import';
       fileInput.value = '';
     }
   }
+
+  // ── VIEW MANAGEMENT ───────────────────────────────────────────
+  function showMeView(view) {
+    meView = view;
+    document.getElementById('meViewList').style.display = view === 'list' ? 'flex' : 'none';
+    document.getElementById('meViewModule').style.display = view === 'module' ? 'flex' : 'none';
+    document.getElementById('meViewSection').style.display = view === 'section' ? 'flex' : 'none';
+    document.getElementById('meViewEditMeta').style.display = view === 'edit-meta' ? 'flex' : 'none';
+  }
+
+  function meBackToList() {
+    if (blockDirty && !confirm('Discard unsaved changes?')) return;
+    blockDirty = false;
+    blockSections = null;
+    showMeView('list');
+    loadModuleEditor();
+  }
+
+  function meBackToModule() {
+    if (blockDirty && !confirm('Discard unsaved changes?')) return;
+    blockDirty = false;
+    blockSections = null;
+    selectedBlockIdx = null;
+    document.getElementById('meBlockTray').style.display = 'none';
+    document.getElementById('meAiPanel').style.display = 'none';
+    showMeView('module');
+  }
+
+  function meBackToModuleFromEdit() {
+    showMeView('module');
+  }
+
+  // ── MODULE EDITOR ─────────────────────────────────────────────
 
   // ── REBUILD INDEX ─────────────────────────────────────────────
   async function rebuildIndex() {
@@ -1387,13 +1407,17 @@ STRICT RULES — you MUST follow these:
     handlePdfDrop, handlePdfSelect, startGeneration,
     editGenSection, saveSectionEdit, deployModule, downloadModuleZip, resetGenerate,
     // Files
-    loadFiles, openFile, deleteFile, deleteFolder, closeBlockEditor, closeRawEditor,
-    selectBlock, insertBlockAt, doInsertBlock, deleteBlock, addBlock,
-    blockAction, applyDrawerEdit, sendDrawerMessage, closeAiDrawer,
-    openSectionChat, closeSectionChat, sendScMessage, scChip, deepenSection,
-    saveBlockEditor,
-    onRawChange, validateRaw, formatRaw, handleRawKey, saveRaw,
-    showUploadZipModal, handleZipUpload,
+    // Module editor
+    loadModuleEditor, meBackToList, meBackToModule, meBackToModuleFromEdit,
+    openModuleDetail, openSectionEditor, switchBlockTab,
+    selectMeBlock, meInsertBlockAt, meDoInsertBlock, meDeleteBlock, meBlockAction, meAiApply, meAiSend,
+    renderMeQuestions, openQuestionEdit, saveQuestionEdit, regenerateQuestions,
+    meChatSend,
+    onMeRawChange, validateMeRaw, formatMeRaw, updateMeRawStatus,
+    saveSectionEditor,
+    openEditModuleMeta, saveModuleMeta, deleteCurrentModule,
+    showModuleZipImport, handleModuleZipImport,
+    deleteFolder,
     rebuildIndex,
     // Sessions
     loadSessions, viewSession, closeSessionDetail, deleteCurrentSession,
