@@ -1,28 +1,32 @@
-// Project 002 — Service Worker v1
+// Project 002 — Service Worker
 const CACHE = 'p002-v1';
+const PRECACHE = [
+  '/project-002/',
+  '/project-002/index.html',
+  '/project-002/admin.html',
+  '/project-002/app.js',
+  '/project-002/admin.js',
+  '/project-002/api.js',
+  '/project-002/security.js',
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll([
-      '/project-002/',
-      '/project-002/index.html',
-    ])).catch(() => {})
+    caches.open(CACHE).then(cache => cache.addAll(PRECACHE)).then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
+    caches.keys().then(keys => Promise.all(
+      keys.filter(k => k !== CACHE).map(k => caches.delete(k))
+    )).then(() => self.clients.claim())
   );
-  e.waitUntil(clients.claim());
 });
 
 self.addEventListener('fetch', e => {
-  // Network first for API/supabase calls
-  if (e.request.url.includes('supabase') || e.request.url.includes('anthropic')) {
+  const url = new URL(e.request.url);
+  if (url.hostname.includes('supabase') || url.hostname.includes('anthropic') || url.hostname.includes('fonts')) {
     return;
   }
   e.respondWith(
