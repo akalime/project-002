@@ -246,7 +246,7 @@ window.P002Admin = (() => {
           const partLabel = sectionsPerChapter > 1 ? ' (Part ' + (s+1) + ')' : '';
           sections.push({
             title: chapter.title + partLabel,
-            text: chunk.slice(0, 2500),
+            text: chunk.slice(0, 4000),
             chapterNum: chIdx + 1,
             partNum: s + 1
           });
