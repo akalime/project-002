@@ -1346,24 +1346,30 @@ window.P002App = (() => {
     if (!books.length) {
       container.innerHTML =
         '<div class="lib-empty">' +
-          '<div class="lib-empty-icon">📚</div>' +
+          '<div class="lib-empty-icon">&#128218;</div>' +
           '<div class="lib-empty-title">No results</div>' +
-          '<div class="lib-empty-sub">Try a different search term. Only pre-1928 public domain content is shown.</div>' +
+          '<div class="lib-empty-sub">Try a different search term.</div>' +
         '</div>';
       return;
     }
+
+    const sourceColors = {
+      'Wikipedia':   { bg: 'rgba(108,143,255,0.1)', border: 'rgba(108,143,255,0.25)', color: '#6c8fff' },
+      'OpenStax':    { bg: 'rgba(74,222,128,0.1)',  border: 'rgba(74,222,128,0.25)',  color: '#4ade80' },
+      'Archive.org': { bg: 'rgba(255,159,67,0.1)',  border: 'rgba(255,159,67,0.25)',  color: '#ff9f43' },
+      'Gutenberg':   { bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.25)', color: '#a78bfa' },
+    };
+    const typeLabels = { article: 'Article', textbook: 'Textbook', book: 'Book' };
 
     books.forEach((book, i) => {
       const row = document.createElement('div');
       row.className = 'book-row';
       row.style.animationDelay = (i * 55) + 'ms';
 
-      const subjectTag = book.subjects?.[0]
-        ? '<div class="book-tag">' + P002Security.escapeHtml(book.subjects[0]) + '</div>'
-        : '';
-      const sourceTag = '<div class="book-tag">' + P002Security.escapeHtml(book.source || '') + '</div>';
-      const pdTag = '<div class="book-tag pd">Public domain</div>';
-
+      const sc = sourceColors[book.source] || sourceColors['Wikipedia'];
+      const typeLabel = typeLabels[book.type] || 'Book';
+      const yearStr = book.year && book.year > 0 ? book.year : '';
+      const safeId = (book.id || '').replace(/[^a-zA-Z0-9-_]/g, '');
       const bookJson = JSON.stringify(book).replace(/"/g, '&quot;');
 
       row.innerHTML =
@@ -1373,44 +1379,57 @@ window.P002App = (() => {
         '</div>' +
         '<div class="book-info">' +
           '<div class="book-title">' + P002Security.escapeHtml(book.title) + '</div>' +
-          '<div class="book-author">' + P002Security.escapeHtml(book.author) + (book.year ? ' · ' + book.year : '') + '</div>' +
-          '<div class="book-tags">' + subjectTag + pdTag + '</div>' +
-        '</div>' +
-        '<button class="book-import" id="import-' + P002Security.escapeHtml(book.id) + '" onclick="P002App.importBook(' + bookJson + ')">+ Import</button>';
+          '<div class="book-author">' + P002Security.escapeHtml(book.author) + (yearStr ? ' &middot; ' + yearStr : '') + '</div>' +
+          '<div class="book-tags">' +
+            '<div class="book-tag" style="background:' + sc.bg + ';border-color:' + sc.border + ';color:' + sc.color + ';">' + P002Security.escapeHtml(book.source) + '</div>' +
+            '<div class="book-tag">' + typeLabel + '</div>' +
+            (book.subjects?.[0] ? '<div class="book-tag">' + P002Security.escapeHtml(book.subjects[0]) + '</div>' : '') +
+          '</div>' +
+          (book.description ? '<div class="book-desc">' + P002Security.escapeHtml(book.description) + '</div>' : '') +
+          '<div class="book-actions">' +
+            (book.textUrl ?
+              '<a class="book-action-btn book-link" href="' + P002Security.escapeHtml(book.textUrl) + '" target="_blank" rel="noopener noreferrer">' +
+                '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>' +
+                'View source' +
+              '</a>'
+            : '') +
+            '<button class="book-action-btn book-import-btn" id="import-' + safeId + '" onclick="P002App.importBook(' + bookJson + ')">+ Import</button>' +
+          '</div>' +
+        '</div>';
 
       container.appendChild(row);
     });
 
-    // Spacer
     const spacer = document.createElement('div');
     spacer.style.height = '60px';
     container.appendChild(spacer);
   }
 
   async function importBook(book) {
-    const safeId = book.id ? book.id.replace(/[^a-zA-Z0-9-_]/g, '') : '';
+    const safeId = (book.id || '').replace(/[^a-zA-Z0-9-_]/g, '');
     const btn = document.getElementById('import-' + safeId);
     if (!btn || btn.classList.contains('imported') || btn.classList.contains('importing')) return;
 
     btn.classList.add('importing');
     btn.innerHTML = '<div class="book-spinner"></div>';
 
-    // TODO: Replace simulation with real edge function call:
+    // TODO: Replace with real edge function call:
     // await P002Api.callEdgeFunction('generate-from-library', {
-    //   title: book.title,
-    //   author: book.author,
+    //   title:   book.title,
+    //   author:  book.author,
+    //   source:  book.source,
+    //   type:    book.type,
     //   textUrl: book.textUrl,
-    //   userId: currentUser.id
+    //   userId:  currentUser.id
     // });
 
-    // Simulate for now
     await new Promise(r => setTimeout(r, 1800));
 
     btn.classList.remove('importing');
     btn.classList.add('imported');
-    btn.textContent = '✓ Added';
+    btn.innerHTML = '&#10003; Added';
 
-    showToast('📚 ' + book.title.slice(0, 30) + (book.title.length > 30 ? '...' : '') + ' added to library', true);
+    showToast('&#128218; ' + book.title.slice(0, 30) + (book.title.length > 30 ? '...' : '') + ' added to library', true);
   }
 
   function libraryReset() {
