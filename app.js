@@ -1492,7 +1492,8 @@ window.P002App = (() => {
         (prefs.focus    ? 'Focus on: ' + prefs.focus + '\n' : '') +
         (prefs.level    ? 'Target level: ' + prefs.level + '\n' : '') +
         (prefs.purpose  ? 'Purpose: ' + prefs.purpose + '\n' : '') +
-        (prefs.include  ? 'Must include: ' + prefs.include + '\n' : '');
+        (prefs.include  ? 'Must include: ' + prefs.include + '\n' : '') +
+        'Number of sections: ' + (prefs.sections || 8) + '\n';
 
       rawText = rawText + prefContext;
 
@@ -1584,6 +1585,25 @@ window.P002App = (() => {
                 'style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-family:var(--font-body);font-size:14px;color:var(--text);outline:none;box-sizing:border-box;" />' +
             '</div>' +
 
+            // Sections
+            '<div>' +
+              '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;">Sections <span id="importSectionCount" style="color:var(--accent);font-weight:800;font-family:var(--font-mono);">8</span></div>' +
+              '<div style="display:flex;align-items:center;gap:12px;">' +
+                '<span style="font-size:10px;color:var(--text-dim);width:12px;">4</span>' +
+                '<input id="importSections" type="range" min="4" max="20" value="8" ' +
+                  'style="flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--accent) 25%,var(--border) 25%);outline:none;cursor:pointer;" ' +
+                  'oninput="document.getElementById('importSectionCount').textContent=this.value;' +
+                    'const pct=((this.value-4)/16)*100;' +
+                    'this.style.background='linear-gradient(90deg,var(--accent) '+pct+'%,var(--border) '+pct+'%)'" />' +
+                '<span style="font-size:10px;color:var(--text-dim);width:16px;">20</span>' +
+              '</div>' +
+              '<div style="display:flex;justify-content:space-between;padding:4px 24px 0;">' +
+                '<span style="font-size:9px;color:var(--text-dim);">Quick overview</span>' +
+                '<span style="font-size:9px;color:var(--text-dim);">Standard</span>' +
+                '<span style="font-size:9px;color:var(--text-dim);">Comprehensive</span>' +
+              '</div>' +
+            '</div>' +
+
           '</div>' +
           // Actions
           '<div style="padding:0 20px;display:flex;gap:10px;">' +
@@ -1625,10 +1645,11 @@ window.P002App = (() => {
       // Confirm
       document.getElementById('importConfirm').addEventListener('click', () => {
         const prefs = {
-          focus:   document.getElementById('importFocus')?.value?.trim() || '',
-          level:   selectedLevel,
-          purpose: document.getElementById('importPurpose')?.value?.trim() || '',
-          include: document.getElementById('importInclude')?.value?.trim() || '',
+          focus:    document.getElementById('importFocus')?.value?.trim() || '',
+          level:    selectedLevel,
+          purpose:  document.getElementById('importPurpose')?.value?.trim() || '',
+          include:  document.getElementById('importInclude')?.value?.trim() || '',
+          sections: parseInt(document.getElementById('importSections')?.value || '8'),
         };
         modal.remove();
         resolve(prefs);
