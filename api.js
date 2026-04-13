@@ -10,8 +10,9 @@ const P002Api = (() => {
   const SUPABASE_URL = 'https://obobtgryhcrptcyaukvw.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ib2J0Z3J5aGNycHRjeWF1a3Z3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3MTUxMzQsImV4cCI6MjA5MTI5MTEzNH0.o3Rq3VqTN6uWzX4Uqfqd8VpH2wlS5PmoDvtRQOMc9EU';
   const ADMIN_USER_ID = '33a3fc69-5fad-4344-ba69-c1a4381be3d5';
-  const CLAUDE_PROXY = `${SUPABASE_URL}/functions/v1/claude-proxy`;
-  const ADMIN_PROXY = `${SUPABASE_URL}/functions/v1/admin-proxy`;
+  const CLAUDE_PROXY    = `${SUPABASE_URL}/functions/v1/claude-proxy`;
+  const ADMIN_PROXY     = `${SUPABASE_URL}/functions/v1/admin-proxy`;
+  const GENERATE_PROXY  = `${SUPABASE_URL}/functions/v1/generate`;
   const BUCKET = 'project002-docs';
 
   // ==================== CLIENT ====================
@@ -56,31 +57,7 @@ const P002Api = (() => {
   }
 
   // ==================== STORAGE ====================
-  async function listBucket(folder = '') {
-    const { data, error } = await getClient().storage
-      .from(BUCKET)
-      .list(folder, { limit: 100, sortBy: { column: 'name' } });
-    if (error) throw error;
-    return data || [];
-  }
-
-  async function downloadFile(path) {
-    const { data, error } = await getClient().storage
-      .from(BUCKET)
-      .download(path);
-    if (error) throw error;
-    return await data.text();
-  }
-
-  async function uploadFile(path, content, contentType = 'application/json') {
-    const blob = new Blob([content], { type: contentType });
-    const { error } = await getClient().storage
-      .from(BUCKET)
-      .upload(path, blob, { upsert: true });
-    if (error) throw error;
-    return true;
-  }
-
+  // Storage kept only for raw uploaded source files
   async function deleteFile(path) {
     const { error } = await getClient().storage
       .from(BUCKET)
@@ -100,20 +77,6 @@ const P002Api = (() => {
       .single();
     if (error) throw error;
     return data.id;
-  }
-
-  async function getLastSession(sectionNumber, module) {
-    const { data, error } = await getClient()
-      .from('sessions')
-      .select('id, section_number, flag_captured, started_at')
-      .eq('section_number', sectionNumber)
-      .eq('module', module)
-      .is('completed_at', null)
-      .order('started_at', { ascending: false })
-      .limit(1)
-      .single();
-    if (error) return null;
-    return data;
   }
 
   async function getSessionMessages(sessionId) {
@@ -183,17 +146,100 @@ const P002Api = (() => {
     return data;
   }
 
-  async function adminGetSessions(limit = 100) { return adminRequest('get_sessions', { limit }); }
-  async function adminGetSessionMessages(sessionId) { return adminRequest('get_session_messages', { session_id: sessionId }); }
-  async function adminGetUsers() { return adminRequest('get_users'); }
-  async function adminGetStats() { return adminRequest('get_stats'); }
-  async function adminRunSql(query) { return adminRequest('run_sql', { query }); }
-  async function adminSaveFile(path, content) { return adminRequest('save_bucket_file', { path, content }); }
-  async function adminGetFile(path) { return adminRequest('get_bucket_file', { path }); }
-  async function adminListFiles(folder) { return adminRequest('list_bucket_files', { folder }); }
-  async function adminDeleteSession(sessionId) { return adminRequest('delete_session', { session_id: sessionId }); }
-  async function adminBanUser(userId, ban = true) { return adminRequest('disable_user', { user_id: userId, ban }); }
-  async function adminCreateUser(email, password) { return adminRequest('create_user', { email, password }); }
+  async function adminGetSessions(limit = 100)       { return adminRequest('get_sessions', { limit }); }
+  async function adminGetSessionMessages(sessionId)  { return adminRequest('get_session_messages', { session_id: sessionId }); }
+  async function adminGetUsers()                     { return adminRequest('get_users'); }
+  async function adminGetStats()                     { return adminRequest('get_stats'); }
+  async function adminRunSql(query)                  { return adminRequest('run_sql', { query }); }
+  async function adminDeleteSession(sessionId)       { return adminRequest('delete_session', { session_id: sessionId }); }
+  async function adminBanUser(userId, ban = true)    { return adminRequest('disable_user', { user_id: userId, ban }); }
+
+  // ==================== GENERATE PROXY ====================
+  async function generateRequest(action, payload = {}) {
+    const session = await getSession();
+    if (!session) throw new Error('Not authenticated');
+    const response = await fetch(GENERATE_PROXY, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({ action, ...payload })
+    });
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  }
+
+  // Init from raw text (library import)
+  async function generateInit(title, author, sourceType, sourceUrl, rawText) {
+    return generateRequest('init', {
+      title, author,
+      source_type: sourceType,
+      source_url:  sourceUrl,
+      raw_text:    rawText,
+    });
+  }
+
+  // Init from uploaded file in Storage
+  async function generateFromUpload(filePath, title) {
+    return generateRequest('from_upload', {
+      file_path: filePath,
+      title,
+    });
+  }
+
+  // Generate one section — call in a loop
+  async function generateSection(courseId, sectionIndex, outline, rawText) {
+    return generateRequest('section', {
+      course_id:     courseId,
+      section_index: sectionIndex,
+      outline,
+      raw_text:      rawText,
+    });
+  }
+
+  // Poll generation status
+  async function generateStatus(courseId) {
+    return generateRequest('status', { course_id: courseId });
+  }
+
+  // Get full course + sections for reading
+  async function getCourse(courseId) {
+    return generateRequest('get_course', { course_id: courseId });
+  }
+
+  // Get all courses for current user
+  async function getMyCourses() {
+    return generateRequest('get_my_courses');
+  }
+
+  // Save reading/KC progress
+  async function saveProgress(sectionId, courseId, read, kcScore) {
+    return generateRequest('save_progress', {
+      section_id: sectionId,
+      course_id:  courseId,
+      read,
+      kc_score:   kcScore,
+    });
+  }
+
+  // Full generation loop — init + all sections
+  // onProgress(pct, sectionTitle, done) called after each section
+  async function generateCourse(title, author, sourceType, sourceUrl, rawText, onProgress) {
+    const { course_id, source_id, outline } = await generateInit(
+      title, author, sourceType, sourceUrl, rawText
+    );
+    const total = outline.sections.length;
+    for (let i = 0; i < total; i++) {
+      const result = await generateSection(course_id, i, outline, rawText);
+      const pct = Math.round(((i + 1) / total) * 100);
+      if (onProgress) onProgress(pct, result.title, result.done);
+      if (result.done) break;
+    }
+    return { course_id, source_id, outline };
+  }
 
   // ==================== PROMPT SIGNING ====================
   const PROMPT_SECRET = 'REPLACE_WITH_YOUR_PROMPT_SECRET';
@@ -213,11 +259,13 @@ const P002Api = (() => {
   return {
     SUPABASE_URL, SUPABASE_ANON_KEY, ADMIN_USER_ID, BUCKET,
     getClient, getSession, getUser, signIn, signUp, signOut, isAdmin,
-    listBucket, downloadFile, uploadFile, deleteFile,
-    createSession, getLastSession, getSessionMessages, saveMessage, completeSession, captureFlag,
+    deleteFile,
+    createSession, getSessionMessages, saveMessage, completeSession, captureFlag,
     callClaude, signPrompt,
-    adminRequest, adminGetSessions, adminGetSessionMessages, adminGetUsers, adminGetStats,
-    adminRunSql, adminSaveFile, adminGetFile, adminListFiles, adminDeleteSession, adminBanUser, adminCreateUser,
+    adminRequest, adminGetSessions, adminGetSessionMessages, adminGetUsers,
+    adminGetStats, adminRunSql, adminDeleteSession, adminBanUser,
+    generateRequest, generateInit, generateFromUpload, generateSection,
+    generateStatus, getCourse, getMyCourses, saveProgress, generateCourse,
   };
 
 })();
