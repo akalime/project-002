@@ -1572,7 +1572,6 @@ window.P002App = (() => {
     renderCourseDetail,
     openSectionFromDB,
     backToHome,
-    backToSectionPreview,
     startReading,
     endReading,
     stickyNextTapped,
