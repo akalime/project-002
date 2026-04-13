@@ -7,23 +7,20 @@
 
 window.P002Fetch = (() => {
 
-  // ==================== CONFIG ====================
   const TIMEOUT_MS = 6000;
-  const PD_CUTOFF = 1928; // Public domain cutoff year
+  const PD_CUTOFF = 1928;
 
   const ENDPOINTS = {
     gutendex:    'https://gutendex.com/books',
     openLibrary: 'https://openlibrary.org/search.json',
     olCovers:    'https://covers.openlibrary.org/b/id',
-    archive:     'https://archive.org/advancedsearch.php',
   };
 
   // ==================== FALLBACK DATA ====================
-  // Used when APIs are blocked by CORS in dev/PWA context
   const FALLBACK = {
     electronics: [
       { id: 'g-21289', title: 'Experimental Researches in Electricity', author: 'Michael Faraday', year: 1839, subjects: ['Electricity', 'Magnetism'], source: 'Gutenberg', textUrl: 'https://www.gutenberg.org/cache/epub/21289/pg21289.txt' },
-      { id: 'g-13476', title: 'A Treatise on Electricity and Magnetism', author: 'James Clerk Maxwell', year: 1873, subjects: ['Electromagnetism', 'Physics'], source: 'Gutenberg', textUrl: 'https://www.gutenberg.org/cache/epub/13476/pg13476.txt' },
+      { id: 'g-13476', title: 'A Treatise on Electricity and Magnetism', author: 'James Clerk Maxwell', year: 1873, subjects: ['Electromagnetism', 'Physics'], source: 'Gutenberg', textUrl: null },
       { id: 'g-28498', title: 'Wireless Telegraphy and Telephony', author: 'Alfred Thomas Story', year: 1904, subjects: ['Radio', 'Telegraph'], source: 'Gutenberg', textUrl: null },
       { id: 'g-14846', title: 'Electricity for Boys', author: 'J.S. Zerbe', year: 1914, subjects: ['Electricity', 'Education'], source: 'Gutenberg', textUrl: null },
       { id: 'ol-1', title: 'The Boy Electrician', author: 'J.W. Sims', year: 1907, subjects: ['Electricity', 'Experiments'], source: 'Open Library', textUrl: null },
@@ -63,8 +60,17 @@ window.P002Fetch = (() => {
       { id: 'g-16294', title: 'The Principles of Chemistry', author: 'Dmitri Mendeleev', year: 1891, subjects: ['Chemistry', 'Periodic Table'], source: 'Gutenberg', textUrl: null },
       { id: 'ol-9',   title: 'A Manual of Chemistry', author: 'William Thomas Brande', year: 1819, subjects: ['Chemistry', 'Elements'], source: 'Open Library', textUrl: null },
     ],
-    programming: [
-      { id: 'g-84',   title: 'Frankenstein', author: 'Mary Shelley', year: 1818, subjects: ['Fiction', 'Science'], source: 'Gutenberg', textUrl: 'https://www.gutenberg.org/cache/epub/84/pg84.txt' },
+    philosophy: [
+      { id: 'g-1497', title: 'The Republic', author: 'Plato', year: -380, subjects: ['Philosophy', 'Politics'], source: 'Gutenberg', textUrl: null },
+      { id: 'g-4705', title: 'Meditations', author: 'Marcus Aurelius', year: 180, subjects: ['Philosophy', 'Stoicism'], source: 'Gutenberg', textUrl: null },
+    ],
+    biology: [
+      { id: 'g-2009', title: 'On the Origin of Species', author: 'Charles Darwin', year: 1859, subjects: ['Evolution', 'Biology'], source: 'Gutenberg', textUrl: null },
+      { id: 'g-5349', title: 'The Descent of Man', author: 'Charles Darwin', year: 1871, subjects: ['Evolution', 'Anthropology'], source: 'Gutenberg', textUrl: null },
+    ],
+    physics: [
+      { id: 'g-5001', title: 'Relativity: The Special and General Theory', author: 'Albert Einstein', year: 1920, subjects: ['Physics', 'Relativity'], source: 'Gutenberg', textUrl: null },
+      { id: 'g-4942', title: 'Mathematical Principles of Natural Philosophy', author: 'Isaac Newton', year: 1687, subjects: ['Physics', 'Mathematics'], source: 'Gutenberg', textUrl: null },
     ],
   };
 
@@ -98,23 +104,43 @@ window.P002Fetch = (() => {
     };
   }
 
+  // Match query to best fallback key — checks both directions
   function getFallback(query) {
-    const q = query.toLowerCase();
-    const key = Object.keys(FALLBACK).find(k => q.includes(k));
-    return (key ? FALLBACK[key] : FALLBACK.science).map(b => normalize(b, b.source));
+    const q = query.toLowerCase().trim();
+    // Exact match first
+    if (FALLBACK[q]) return FALLBACK[q].map(b => normalize(b, b.source));
+    // Query contains a key
+    const keyInQuery = Object.keys(FALLBACK).find(k => q.includes(k));
+    if (keyInQuery) return FALLBACK[keyInQuery].map(b => normalize(b, b.source));
+    // Key contains query (e.g. "chem" matches "chemistry")
+    const queryInKey = Object.keys(FALLBACK).find(k => k.includes(q));
+    if (queryInKey) return FALLBACK[queryInKey].map(b => normalize(b, b.source));
+    // Default to science not electronics
+    return FALLBACK.science.map(b => normalize(b, b.source));
   }
 
   // ==================== GUTENDEX ====================
+  // Uses topic= for subject-based search — much more accurate than search=
+  // Falls back to search= if topic returns nothing
 
   async function fetchGutendex(query) {
-    const url = ENDPOINTS.gutendex + '/?search=' + encodeURIComponent(query) + '&languages=en';
-    const res = await safeFetch(url);
-    const data = await res.json();
+    // Try topic search first (subject taxonomy)
+    const topicUrl = ENDPOINTS.gutendex + '/?topic=' + encodeURIComponent(query) + '&languages=en';
+    let res = await safeFetch(topicUrl);
+    let data = await res.json();
+
+    // If topic returns nothing, fall back to keyword search
+    if (!data.results || data.results.length === 0) {
+      const searchUrl = ENDPOINTS.gutendex + '/?search=' + encodeURIComponent(query) + '&languages=en&topic=' + encodeURIComponent(query);
+      res = await safeFetch(searchUrl);
+      data = await res.json();
+    }
+
     return (data.results || []).slice(0, 8).map(b => normalize({
       id:       'g-' + b.id,
       title:    b.title,
       author:   b.authors?.[0]?.name || 'Unknown',
-      year:     null, // Gutendex doesn't return year reliably
+      year:     null,
       subjects: b.subjects || [],
       textUrl:  b.formats?.['text/plain; charset=utf-8'] ||
                 b.formats?.['text/plain'] ||
@@ -148,36 +174,14 @@ window.P002Fetch = (() => {
       }, 'Open Library'));
   }
 
-  // ==================== ARCHIVE.ORG ====================
-  // Future — placeholder for now
-
-  async function fetchArchive(query) {
-    const url = ENDPOINTS.archive +
-      '?q=' + encodeURIComponent(query) +
-      '+AND+mediatype:texts+AND+licenseurl:*publicdomain*' +
-      '&fl=identifier,title,creator,date,subject' +
-      '&rows=6&output=json';
-    const res = await safeFetch(url);
-    const data = await res.json();
-    return (data.response?.docs || []).map(b => normalize({
-      id:      'ia-' + b.identifier,
-      title:   b.title || 'Unknown',
-      author:  Array.isArray(b.creator) ? b.creator[0] : (b.creator || 'Unknown'),
-      year:    b.date ? parseInt(b.date) : null,
-      subjects: Array.isArray(b.subject) ? b.subject : [],
-      textUrl: 'https://archive.org/download/' + b.identifier + '/' + b.identifier + '_djvu.txt',
-    }, 'Internet Archive'));
-  }
-
   // ==================== PUBLIC API ====================
 
-  // Main search — tries live APIs, falls back to mock on failure
   async function searchLibrary(query) {
     if (!query || !query.trim()) return [];
 
     const results = [];
 
-    // Try Gutendex
+    // Try Gutendex with topic-based search
     try {
       const gutenbergBooks = await fetchGutendex(query);
       results.push(...gutenbergBooks);
@@ -197,69 +201,47 @@ window.P002Fetch = (() => {
       console.warn('[P002Fetch] Open Library failed:', e.message);
     }
 
-    // If both failed, use fallback
+    // Fall back to curated mock data if both APIs fail
     if (!results.length) {
-      console.info('[P002Fetch] Using fallback data for:', query);
+      console.info('[P002Fetch] Using fallback for:', query);
       return getFallback(query);
     }
 
     return results;
   }
 
-  // Fetch raw text content of a book for generation pipeline
+  // Fetch raw text for generation pipeline
   async function fetchBookText(textUrl) {
     if (!textUrl) throw new Error('No text URL provided');
     const res = await safeFetch(textUrl);
     const text = await res.text();
-    // Strip Gutenberg header/footer boilerplate
     return stripGutenbergBoilerplate(text);
   }
 
   function stripGutenbergBoilerplate(text) {
-    // Remove everything before "*** START OF" marker
     const startMarker = text.indexOf('*** START OF');
     if (startMarker !== -1) {
       const afterStart = text.indexOf('\n', startMarker);
       text = text.slice(afterStart + 1);
     }
-    // Remove everything after "*** END OF" marker
     const endMarker = text.indexOf('*** END OF');
-    if (endMarker !== -1) {
-      text = text.slice(0, endMarker);
-    }
+    if (endMarker !== -1) text = text.slice(0, endMarker);
     return text.trim();
   }
 
-  // Future: OpenStax
-  async function searchOpenStax(query) {
-    // TODO: OpenStax doesn't have a public API yet
-    // Will scrape or use their subject catalog
-    throw new Error('OpenStax not yet implemented');
-  }
+  // Future APIs — placeholders
+  async function searchOpenStax(query) { throw new Error('OpenStax not yet implemented'); }
+  async function searchNASA(query)     { throw new Error('NASA not yet implemented'); }
+  async function searchArxiv(query)    { throw new Error('arXiv not yet implemented'); }
 
-  // Future: NASA Technical Reports
-  async function searchNASA(query) {
-    // TODO: https://ntrs.nasa.gov/api/citations/search?query=
-    throw new Error('NASA search not yet implemented');
-  }
-
-  // Future: arXiv papers
-  async function searchArxiv(query) {
-    // TODO: http://export.arxiv.org/api/query?search_query=
-    throw new Error('arXiv search not yet implemented');
-  }
-
-  // ==================== EXPOSE ====================
   return {
     searchLibrary,
     fetchBookText,
     searchOpenStax,
     searchNASA,
     searchArxiv,
-    // Internals exposed for testing
     _fetchGutendex:    fetchGutendex,
     _fetchOpenLibrary: fetchOpenLibrary,
-    _fetchArchive:     fetchArchive,
   };
 
 })();
