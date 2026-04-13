@@ -70,7 +70,7 @@ window.P002App = (() => {
   }
 
   // ==================== COURSE CATALOG ====================
-  async async function loadMyCourses() {
+  async function loadMyCourses() {
     const grid = document.getElementById('moduleGrid');
     if (!grid) return;
 
