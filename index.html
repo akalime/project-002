@@ -403,6 +403,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .lib-status-text{font-family:var(--font-mono);font-size:7px;color:#1a1a1a;letter-spacing:1px;}
 @keyframes libSpin{to{transform:rotate(360deg)}}
 @keyframes libSparkPulse{0%,100%{opacity:0.4;transform:scale(0.92)}50%{opacity:1;transform:scale(1.05)}}
+.book-desc{font-size:10px;color:var(--text-dim);line-height:1.5;margin:4px 0 6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.book-actions{display:flex;gap:6px;margin-top:7px;align-items:center;}
+.book-action-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;font-size:10px;font-weight:600;font-family:var(--font-body);cursor:pointer;transition:all 0.15s;white-space:nowrap;text-decoration:none;}
+.book-link{background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--text-dim);}
+.book-link:hover{border-color:var(--border2);color:var(--text-muted);}
+.book-import-btn{background:rgba(255,77,77,0.1);border:1px solid rgba(255,77,77,0.2);color:var(--accent);}
+.book-import-btn:hover{background:rgba(255,77,77,0.15);}
+.book-import-btn.importing{background:transparent;border-color:var(--border);color:var(--text-dim);cursor:default;pointer-events:none;}
+.book-import-btn.imported{background:rgba(74,222,128,0.1);border-color:rgba(74,222,128,0.25);color:var(--success);cursor:default;pointer-events:none;}
+
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
