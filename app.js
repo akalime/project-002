@@ -1,7 +1,7 @@
 // ================================================================
 // PROJECT 002 -- app.js
 // Reading platform logic
-// Depends on: security.js, api.js
+// Depends on: security.js, api.js, fetch.js
 // ================================================================
 
 window.P002App = (() => {
@@ -19,13 +19,13 @@ window.P002App = (() => {
   let readerScrollHandler = null;
 
   // Drawer state
-  let drawerHistory = [];       // [{role, content}] for drawer conversation
+  let drawerHistory = [];
   let selectedText = '';
   let currentDrawerAction = '';
 
-  // Chat state (free chat + debrief)
+  // Chat state
   let chatHistory = [];
-  let chatMode = 'free';        // 'free' | 'debrief'
+  let chatMode = 'free';
   let currentChallengePassed = false;
 
   // Challenge state
@@ -35,8 +35,13 @@ window.P002App = (() => {
   let kcQuestions = [];
   let kcCurrentIdx = 0;
   let kcScore = 0;
-  let kcAnswers = [];         // {correct: bool, type: string} per question
+  let kcAnswers = [];
   let kcExplainHistory = [];
+
+  // Library state
+  let libDotInterval = null;
+
+  const LIB_SUGGESTIONS = ['electronics', 'science', 'history', 'medicine', 'engineering', 'mathematics', 'astronomy', 'chemistry'];
 
   // ==================== INIT ====================
   async function init() {
@@ -122,12 +127,12 @@ window.P002App = (() => {
   const MODULE_INDEX_PATH = 'index.json';
 
   const CATEGORY_ICONS = {
-    'Web Fundamentals': '??',
+    'Web Fundamentals': '🌐',
     'Web Exploitation': '⚡',
-    'Network': '??',
-    'Defense': '??',
-    'Systems': '??',
-    'Other': '??',
+    'Network': '🔗',
+    'Defense': '🛡',
+    'Systems': '⚙',
+    'Other': '📁',
   };
 
   async function loadModuleCatalog() {
@@ -150,7 +155,7 @@ window.P002App = (() => {
           difficulty: 'intermediate',
           section_count: 0,
           estimated_hours: 0,
-          icon: '??'
+          icon: '📁'
         }));
       }
 
@@ -188,7 +193,7 @@ window.P002App = (() => {
     const card = document.createElement('div');
     card.style.cssText = 'margin:0 16px 8px;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color 0.15s,transform 0.15s;';
 
-    const icon = m.icon || CATEGORY_ICONS[m.category] || '??';
+    const icon = m.icon || CATEGORY_ICONS[m.category] || '📁';
     const secs = m.section_count || 0;
     const hrs = m.estimated_hours || 0;
     const diff = m.difficulty || 'intermediate';
@@ -310,8 +315,6 @@ window.P002App = (() => {
       sectionData = validation.data;
       btn.disabled = false;
       status.textContent = '';
-
-      // Update button text based on schema
       btn.textContent = validation.schema === 'reader' ? 'Start Reading →' : 'Start Session →';
     } catch(e) {
       status.textContent = '✗ Failed to load: ' + P002Security.escapeHtml(e.message);
@@ -333,13 +336,11 @@ window.P002App = (() => {
 
     const validation = P002Security.validateLessonJson(JSON.stringify(sectionData));
 
-    // Legacy section — fall back to old chat-based session
     if (validation.schema === 'legacy') {
       startLegacySession();
       return;
     }
 
-    // New reader schema
     const meta = sectionData.meta;
     document.getElementById('readerChapter').textContent =
       'Section ' + meta.section + ' of ' + meta.total_sections + ' · ' + meta.module;
@@ -353,7 +354,6 @@ window.P002App = (() => {
 
     initTextSelection();
 
-    // Sticky next bar — show when reader hits bottom
     const readerContent = document.getElementById('readerContent');
     const stickyBar = document.getElementById('readerStickyNext');
     if (stickyBar) stickyBar.style.display = 'none';
@@ -361,7 +361,6 @@ window.P002App = (() => {
       readerScrollHandler = () => {
         const nearBottom = readerContent.scrollTop + readerContent.clientHeight >= readerContent.scrollHeight - 60;
         if (stickyBar) stickyBar.style.display = nearBottom ? 'flex' : 'none';
-        // Update progress fill
         const pct = readerContent.scrollHeight <= readerContent.clientHeight ? 100 :
           Math.min(100, Math.round((readerContent.scrollTop / (readerContent.scrollHeight - readerContent.clientHeight)) * 100));
         document.getElementById('readerProgressFill').style.width = pct + '%';
@@ -369,12 +368,10 @@ window.P002App = (() => {
       readerContent.addEventListener('scroll', readerScrollHandler);
     }
 
-    // Populate sticky next bar title
     const nextMeta = currentModule?.sections?.[currentModule.sections.indexOf(currentSectionMeta) + 1];
     const nextTitle = document.getElementById('stickyNextTitle');
     if (nextTitle) nextTitle.textContent = nextMeta?.title || 'Module complete';
 
-    // Create session for progress tracking
     try {
       currentSessionId = await P002Api.createSession(meta.section, meta.module);
     } catch(e) {
@@ -385,7 +382,6 @@ window.P002App = (() => {
   function endReading() {
     removeTextSelectionHandler();
     closeDrawer();
-    // Remove scroll handler
     const readerContent = document.getElementById('readerContent');
     if (readerContent && readerScrollHandler) {
       readerContent.removeEventListener('scroll', readerScrollHandler);
@@ -400,8 +396,6 @@ window.P002App = (() => {
 
   // ==================== STICKY NEXT BAR ====================
   function stickyNextTapped() {
-    // If knowledge_check exists, go to KC prompt screen
-    // Otherwise go straight to next section
     const kcData = sectionData?.knowledge_check;
     if (kcData?.questions?.length > 0) {
       showKcPrompt();
@@ -417,9 +411,7 @@ window.P002App = (() => {
     showScreen('kcPromptScreen');
   }
 
-  function skipKcGoNext() {
-    goToNextSection();
-  }
+  function skipKcGoNext() { goToNextSection(); }
 
   function goToNextSection() {
     if (!currentModule || !currentSectionMeta) { showScreen('moduleScreen'); return; }
@@ -444,7 +436,6 @@ window.P002App = (() => {
     kcAnswers = [];
     kcExplainHistory = [];
 
-    // Set section title in KC header
     const titleEl = document.getElementById('kcSectionTitle');
     if (titleEl) titleEl.textContent = sectionData?.meta?.title || 'Knowledge Check';
 
@@ -456,13 +447,11 @@ window.P002App = (() => {
     const q = kcQuestions[kcCurrentIdx];
     if (!q) { showKcResults(); return; }
 
-    // Progress dots
     const dotsEl = document.getElementById('kcDots');
     dotsEl.innerHTML = '';
     kcQuestions.forEach((_, i) => {
       const dot = document.createElement('div');
-      dot.className = 'kc-dot' +
-        (i < kcCurrentIdx ? ' done' : i === kcCurrentIdx ? ' active' : '');
+      dot.className = 'kc-dot' + (i < kcCurrentIdx ? ' done' : i === kcCurrentIdx ? ' active' : '');
       dotsEl.appendChild(dot);
     });
 
@@ -475,10 +464,10 @@ window.P002App = (() => {
     optionsEl.innerHTML = '';
 
     if (q.type === 'mc') {
-      q.options.forEach((opt, i) => {
+      q.options.forEach((opt) => {
         const el = document.createElement('div');
         el.className = 'kc-option';
-        el.dataset.value = opt.charAt(0); // A, B, C, D
+        el.dataset.value = opt.charAt(0);
         el.innerHTML = '<div class="kc-letter">' + opt.charAt(0) + '</div><div class="kc-opt-text">' + P002Security.escapeHtml(opt.slice(3)) + '</div>';
         el.onclick = () => selectKcOption(el, opt.charAt(0));
         optionsEl.appendChild(el);
@@ -505,7 +494,6 @@ window.P002App = (() => {
     submitBtn.className = 'kc-submit' + (q.type === 'sa' ? '' : ' disabled');
     submitBtn.onclick = submitKcAnswer;
 
-    // Enable SA button when text entered
     if (q.type === 'sa') {
       setTimeout(() => {
         const ta = document.getElementById('kcSaInput');
@@ -540,7 +528,6 @@ window.P002App = (() => {
       if (!selected) return;
       userAnswer = selected.dataset.value;
       isCorrect = userAnswer === q.answer;
-      // Mark options
       document.querySelectorAll('#kcOptions .kc-option').forEach(o => {
         if (o.dataset.value === q.answer) o.classList.add('correct');
         else if (o.dataset.value === userAnswer && !isCorrect) o.classList.add('wrong');
@@ -559,7 +546,6 @@ window.P002App = (() => {
       const ta = document.getElementById('kcSaInput');
       userAnswer = ta?.value?.trim() || '';
       ta.disabled = true;
-      // Grade with AI
       feedbackEl.style.display = 'block';
       document.getElementById('kcFeedbackIcon').textContent = '···';
       document.getElementById('kcFeedbackText').textContent = 'Grading...';
@@ -577,7 +563,6 @@ window.P002App = (() => {
         isCorrect = graded.correct === true;
         showKcFeedback(isCorrect, graded.feedback || q.sample_answer, q.type);
       } catch(e) {
-        // Fallback — mark as informational
         isCorrect = true;
         showKcFeedback(true, q.sample_answer, q.type);
       }
@@ -594,21 +579,17 @@ window.P002App = (() => {
   function showKcFeedback(isCorrect, explanation, type) {
     const feedbackEl = document.getElementById('kcFeedback');
     feedbackEl.style.display = 'block';
-
     document.getElementById('kcFeedbackIcon').textContent = isCorrect ? '✓' : '✗';
     const resultText = document.getElementById('kcFeedbackText');
     resultText.textContent = isCorrect ? 'Correct' : (type === 'sa' ? 'See model answer' : 'Not quite');
     resultText.className = 'kc-result-text ' + (isCorrect ? 'correct' : 'wrong');
-
     document.getElementById('kcExplanation').textContent = explanation || '';
-
     const nextBtn = document.getElementById('kcNextBtn');
     const isLast = kcCurrentIdx >= kcQuestions.length - 1;
     nextBtn.textContent = isLast ? 'See Results' : 'Next Question →';
     nextBtn.className = 'kc-next-btn' + (isLast ? ' last' : '');
     nextBtn.style.display = 'block';
     nextBtn.onclick = kcNextQuestion;
-
     const explainBtn = document.getElementById('kcExplainBtn');
     explainBtn.style.display = (!isCorrect && type !== 'sa') ? 'block' : 'none';
   }
@@ -616,11 +597,8 @@ window.P002App = (() => {
   function kcNextQuestion() {
     document.getElementById('kcExplainDrawer').style.display = 'none';
     kcCurrentIdx++;
-    if (kcCurrentIdx >= kcQuestions.length) {
-      showKcResults();
-    } else {
-      renderKcQuestion();
-    }
+    if (kcCurrentIdx >= kcQuestions.length) showKcResults();
+    else renderKcQuestion();
   }
 
   async function kcOpenExplain() {
@@ -663,7 +641,6 @@ window.P002App = (() => {
   function showKcResults() {
     const total = kcQuestions.length;
     const pct = total > 0 ? Math.round((kcScore / total) * 100) : 0;
-
     document.getElementById('kcResultsScore').textContent = kcScore + '/' + total;
     document.getElementById('kcResultsPct').textContent = pct + '%';
     document.getElementById('kcResultsTotal').textContent = total;
@@ -675,9 +652,7 @@ window.P002App = (() => {
 
     document.getElementById('kcResultsIcon').textContent = icon;
     document.getElementById('kcResultsTitle').textContent = title;
-
-    const missed = total - kcScore;
-    document.getElementById('kcResultsMissed').textContent = missed;
+    document.getElementById('kcResultsMissed').textContent = total - kcScore;
 
     const nextBtn = document.getElementById('kcResultsNextBtn');
     const hasNext = currentModule?.sections &&
@@ -689,28 +664,20 @@ window.P002App = (() => {
   }
 
   function kcRetry() {
-    kcCurrentIdx = 0;
-    kcScore = 0;
-    kcAnswers = [];
+    kcCurrentIdx = 0; kcScore = 0; kcAnswers = [];
     renderKcQuestion();
     showScreen('kcScreen');
   }
 
-  function kcReviewSection() {
-    showScreen('readerScreen');
-  }
+  function kcReviewSection() { showScreen('readerScreen'); }
+
+  // ==================== READER CONTENT ====================
   function renderReaderContent() {
     const body = document.getElementById('readerBody');
     body.innerHTML = '';
-
     const blocks = sectionData.content || [];
+    blocks.forEach(block => { const el = renderBlock(block); if (el) body.appendChild(el); });
 
-    blocks.forEach(block => {
-      const el = renderBlock(block);
-      if (el) body.appendChild(el);
-    });
-
-    // Challenge CTA at end if challenge exists
     if (sectionData.challenge) {
       const cta = document.createElement('div');
       cta.className = 'reader-challenge-cta';
@@ -718,12 +685,11 @@ window.P002App = (() => {
         '<div class="reader-cta-label">End of section</div>' +
         '<div class="reader-cta-title">' + P002Security.escapeHtml(sectionData.challenge.title || 'Practice Challenge') + '</div>' +
         '<div class="reader-cta-desc">' + P002Security.escapeHtml(sectionData.challenge.description || 'Apply what you just read in a hands-on challenge.') + '</div>' +
-        '<button class="reader-cta-btn" onclick="P002App.openChallenge()">?? Start Challenge →</button>' +
+        '<button class="reader-cta-btn" onclick="P002App.openChallenge()">🚩 Start Challenge →</button>' +
         '<div class="reader-cta-skip" onclick="P002App.skipChallenge()">Skip for now</div>';
       body.appendChild(cta);
     }
 
-    // Track read progress on scroll
     const progressFill = document.getElementById('readerProgressFill');
     readerScrollHandler = () => {
       const scrollTop = body.scrollTop;
@@ -745,7 +711,6 @@ window.P002App = (() => {
       case 'body': {
         const el = document.createElement('div');
         el.className = 'content-body';
-        // Allow basic markdown: **bold**, `code`
         el.innerHTML = formatBodyText(block.text || '');
         return el;
       }
@@ -753,28 +718,21 @@ window.P002App = (() => {
         const el = document.createElement('div');
         el.className = 'content-code';
         el.textContent = block.text || '';
-        if (block.lang) {
-          el.dataset.lang = block.lang;
-        }
+        if (block.lang) el.dataset.lang = block.lang;
         return el;
       }
       case 'callout': {
         const el = document.createElement('div');
         el.className = 'content-callout';
-        el.innerHTML =
-          '<div class="content-callout-icon">⚡</div>' +
-          '<div class="content-callout-text">' + formatBodyText(block.text || '') + '</div>';
+        el.innerHTML = '<div class="content-callout-icon">⚡</div><div class="content-callout-text">' + formatBodyText(block.text || '') + '</div>';
         return el;
       }
-      default:
-        return null;
+      default: return null;
     }
   }
 
   function formatBodyText(text) {
-    // Escape HTML first
     let safe = P002Security.escapeHtml(text);
-    // Parse markdown headings before other formatting
     safe = safe
       .replace(/^### (.+)$/gm, '<strong style="font-size:13px;color:var(--text);">$1</strong>')
       .replace(/^## (.+)$/gm, '<strong style="font-size:15px;color:var(--text);display:block;margin:10px 0 4px;">$1</strong>')
@@ -808,23 +766,12 @@ window.P002App = (() => {
     selectionChangeTimeout = setTimeout(() => {
       const selection = window.getSelection();
       const text = selection ? selection.toString().trim() : '';
-
-      if (!text || text.length < 3) {
-        hidePopup();
-        return;
-      }
-
-      // Only trigger if selection is inside reader body
+      if (!text || text.length < 3) { hidePopup(); return; }
       const readerBody = document.getElementById('readerBody');
       if (!readerBody) return;
-
       const range = selection.getRangeAt(0);
       const container = range.commonAncestorContainer;
-      if (!readerBody.contains(container)) {
-        hidePopup();
-        return;
-      }
-
+      if (!readerBody.contains(container)) { hidePopup(); return; }
       selectedText = text;
       showPopupNearSelection(range);
     }, 200);
@@ -833,24 +780,12 @@ window.P002App = (() => {
   function showPopupNearSelection(range) {
     const popup = document.getElementById('askAiPopup');
     const rect = range.getBoundingClientRect();
-
-    let top = rect.top - 48 - 10; // above selection, account for header
+    let top = rect.top - 48 - 10;
     let left = rect.left;
-
-    // Keep popup on screen
     const popupWidth = 280;
-    if (left + popupWidth > window.innerWidth - 10) {
-      left = window.innerWidth - popupWidth - 10;
-    }
+    if (left + popupWidth > window.innerWidth - 10) left = window.innerWidth - popupWidth - 10;
     if (left < 10) left = 10;
-
-    // If too close to top, show below
-    if (top < 58) {
-      top = rect.bottom - 48 + 10;
-      // Move caret to top
-      popup.style.setProperty('--caret-top', 'none');
-    }
-
+    if (top < 58) top = rect.bottom - 48 + 10;
     popup.style.top = top + 'px';
     popup.style.left = left + 'px';
     popup.classList.add('visible');
@@ -865,19 +800,9 @@ window.P002App = (() => {
     hidePopup();
     window.getSelection()?.removeAllRanges();
 
-    if (action === 'chat') {
-      // Open full chat with context
-      openFreeChat(selectedText);
-      return;
-    }
+    if (action === 'chat') { openFreeChat(selectedText); return; }
 
-    // Open drawer
-    const labels = {
-      explain: 'Explain',
-      example: 'Example',
-      deeper: 'Go Deeper'
-    };
-
+    const labels = { explain: 'Explain', example: 'Example', deeper: 'Go Deeper' };
     currentDrawerAction = action;
     drawerHistory = [];
 
@@ -887,14 +812,12 @@ window.P002App = (() => {
     const quoteWrap = document.getElementById('drawerQuoteWrap');
     quoteWrap.style.display = 'block';
     document.getElementById('drawerQuote').textContent = '"' + selectedText.slice(0, 120) + (selectedText.length > 120 ? '...' : '') + '"';
-
     document.getElementById('drawerResponse').textContent = '';
     document.getElementById('drawerChips').innerHTML = '';
     document.getElementById('drawerTyping').style.display = 'flex';
 
     openDrawer();
 
-    // Call Claude
     const systemPrompt = buildDrawerSystemPrompt(action);
     const userMsg = buildDrawerUserMessage(action, selectedText);
 
@@ -902,10 +825,7 @@ window.P002App = (() => {
       const reply = await P002Api.callClaude(systemPrompt, [{ role: 'user', content: userMsg }]);
       document.getElementById('drawerTyping').style.display = 'none';
       document.getElementById('drawerResponse').innerHTML = formatBodyText(reply);
-      drawerHistory = [
-        { role: 'user', content: userMsg },
-        { role: 'assistant', content: reply }
-      ];
+      drawerHistory = [{ role: 'user', content: userMsg }, { role: 'assistant', content: reply }];
       renderDrawerChips();
     } catch(e) {
       document.getElementById('drawerTyping').style.display = 'none';
@@ -916,9 +836,7 @@ window.P002App = (() => {
   function buildDrawerSystemPrompt(action) {
     const sectionTitle = sectionData?.meta?.title || '';
     const aiContext = sectionData?.ai_context || '';
-    return `You are an AI tutor helping a student learn cybersecurity. The student is reading a section titled "${sectionTitle}". Context: ${aiContext}
-
-Be concise and direct. Responses should be 2-4 sentences max unless a code example is needed. No filler, no preamble.`;
+    return `You are an AI tutor helping a student learn cybersecurity. The student is reading a section titled "${sectionTitle}". Context: ${aiContext}\n\nBe concise and direct. Responses should be 2-4 sentences max unless a code example is needed. No filler, no preamble.`;
   }
 
   function buildDrawerUserMessage(action, text) {
@@ -959,10 +877,7 @@ Be concise and direct. Responses should be 2-4 sentences max unless a code examp
   async function sendDrawerMessageText(text) {
     document.getElementById('drawerTyping').style.display = 'flex';
     document.getElementById('drawerSendBtn').disabled = true;
-
     drawerHistory.push({ role: 'user', content: text });
-
-    // Append user message to response area
     const responseEl = document.getElementById('drawerResponse');
     responseEl.innerHTML += '<div style="margin-top:10px;padding:8px 10px;background:rgba(255,77,77,0.08);border-radius:8px;font-size:12px;color:#ccc;">' + P002Security.escapeHtml(text) + '</div>';
 
@@ -979,8 +894,6 @@ Be concise and direct. Responses should be 2-4 sentences max unless a code examp
     }
 
     document.getElementById('drawerSendBtn').disabled = false;
-
-    // Scroll drawer to bottom
     const scroll = document.getElementById('drawerScroll');
     scroll.scrollTop = scroll.scrollHeight;
   }
@@ -1000,18 +913,13 @@ Be concise and direct. Responses should be 2-4 sentences max unless a code examp
   function openFreeChat(contextText) {
     chatMode = 'free';
     chatHistory = [];
-
     document.getElementById('chatHeaderLabel').textContent = 'AI Tutor';
     document.getElementById('chatHeaderTitle').textContent = sectionData?.meta?.title || 'Free chat';
     document.getElementById('debriefBanner').style.display = 'none';
     document.getElementById('chatContinueBtn').style.display = 'none';
-
-    const msgs = document.getElementById('messages');
-    msgs.innerHTML = '';
-
+    document.getElementById('messages').innerHTML = '';
     showScreen('chatScreen');
 
-    // Open with context if text was selected
     if (contextText) {
       const systemPrompt = buildFreeChatSystemPrompt();
       const userMsg = 'I want to chat about this: "' + contextText + '"';
@@ -1019,9 +927,7 @@ Be concise and direct. Responses should be 2-4 sentences max unless a code examp
       chatHistory.push({ role: 'user', content: userMsg });
       callClaude(systemPrompt, chatHistory);
     } else {
-      // Open with greeting
-      const systemPrompt = buildFreeChatSystemPrompt();
-      callClaude(systemPrompt, [{ role: 'user', content: 'Hi, I just read the section and want to ask some questions.' }]);
+      callClaude(buildFreeChatSystemPrompt(), [{ role: 'user', content: 'Hi, I just read the section and want to ask some questions.' }]);
     }
   }
 
@@ -1033,22 +939,18 @@ Be concise and direct. Responses should be 2-4 sentences max unless a code examp
   function buildFreeChatSystemPrompt() {
     const title = sectionData?.meta?.title || '';
     const aiContext = sectionData?.ai_context || '';
-    return `You are an AI tutor for a cybersecurity learning platform. The student has just read a section titled "${title}". Context: ${aiContext}
-
-Answer questions clearly and concisely. If they ask something off-topic, gently redirect to the section content. Don't be preachy. Keep responses focused.`;
+    return `You are an AI tutor for a cybersecurity learning platform. The student has just read a section titled "${title}". Context: ${aiContext}\n\nAnswer questions clearly and concisely. If they ask something off-topic, gently redirect to the section content. Don't be preachy. Keep responses focused.`;
   }
 
-  // ==================== CHALLENGE SCREEN ====================
+  // ==================== CHALLENGE ====================
   function openChallenge() {
     if (!sectionData?.challenge) return;
     const ch = sectionData.challenge;
     currentHintIndex = 0;
     currentChallengePassed = false;
-
     document.getElementById('challengeBackLabel').textContent = sectionData.meta?.title || 'Back to reading';
     document.getElementById('challengeTitle').textContent = ch.title || 'Practice Challenge';
     document.getElementById('challengeDesc').textContent = ch.description || '';
-
     renderChallengeBody(ch);
     showScreen('challengeScreen');
   }
@@ -1057,7 +959,6 @@ Answer questions clearly and concisely. If they ask something off-topic, gently 
     const body = document.getElementById('challengeBody');
     body.innerHTML = '';
 
-    // Query display
     if (ch.query) {
       const queryEl = document.createElement('div');
       queryEl.className = 'challenge-query';
@@ -1065,7 +966,6 @@ Answer questions clearly and concisely. If they ask something off-topic, gently 
       body.appendChild(queryEl);
     }
 
-    // Simulated target app (login form for SQLi)
     if (ch.sim_type === 'login' || ch.query) {
       const sim = document.createElement('div');
       sim.className = 'target-app';
@@ -1087,23 +987,21 @@ Answer questions clearly and concisely. If they ask something off-topic, gently 
       body.appendChild(sim);
     }
 
-    // Flag submission area
     const flagArea = document.createElement('div');
     flagArea.className = 'flag-area';
     flagArea.innerHTML =
-      '<div class="flag-label">?? Your Payload</div>' +
+      '<div class="flag-label">🚩 Your Payload</div>' +
       '<input class="flag-input" id="flagInput" placeholder="Enter your payload..." ' +
-        'onkeydown="if(event.key===&#39;Enter&#39;)P002App.submitFlag()" />' +
+        'onkeydown="if(event.key===\'Enter\')P002App.submitFlag()" />' +
       '<button class="flag-submit" onclick="P002App.submitFlag()">Submit Flag</button>';
     body.appendChild(flagArea);
 
-    // Help row
     const helpRow = document.createElement('div');
     helpRow.className = 'challenge-help-row';
     helpRow.innerHTML =
-      '<button class="challenge-help-btn" onclick="P002App.backToReader()">?? Review</button>' +
-      '<button class="challenge-help-btn ai" onclick="P002App.showHint()">?? Hint</button>' +
-      '<button class="challenge-help-btn ai" onclick="P002App.openChallengeChat()">?? Discuss</button>';
+      '<button class="challenge-help-btn" onclick="P002App.backToReader()">📖 Review</button>' +
+      '<button class="challenge-help-btn ai" onclick="P002App.showHint()">💡 Hint</button>' +
+      '<button class="challenge-help-btn ai" onclick="P002App.openChallengeChat()">💬 Discuss</button>';
     body.appendChild(helpRow);
   }
 
@@ -1111,10 +1009,7 @@ Answer questions clearly and concisely. If they ask something off-topic, gently 
     const pass = document.getElementById('simPass')?.value || '';
     const result = document.getElementById('simResult');
     const flag = sectionData?.challenge?.flag || '';
-
-    // Check if the payload is the flag or contains injection
     const isInjection = pass.includes("'") && (pass.toLowerCase().includes('or') || pass.includes('1=1') || pass.includes('--'));
-
     if (pass.toLowerCase().trim() === flag.toLowerCase().trim() || isInjection) {
       result.innerHTML = '<span style="color:#4ade80;">⚠️ SQL Error — Login bypassed! Access granted.</span>';
       document.getElementById('flagInput').value = pass;
@@ -1129,19 +1024,13 @@ Answer questions clearly and concisely. If they ask something off-topic, gently 
     const input = document.getElementById('flagInput');
     const submitted = P002Security.sanitizeInput(input.value.trim(), 200);
     const correct = sectionData?.challenge?.flag || '';
-
     if (!submitted) return;
-
     if (submitted.toLowerCase() === correct.toLowerCase()) {
       flagCaptured(submitted);
     } else {
-      // Fuzzy match for common variations
-      const normalizedSubmit = submitted.replace(/\s/g, '').toLowerCase();
-      const normalizedCorrect = correct.replace(/\s/g, '').toLowerCase();
-      if (normalizedSubmit === normalizedCorrect) {
-        flagCaptured(submitted);
-        return;
-      }
+      const ns = submitted.replace(/\s/g, '').toLowerCase();
+      const nc = correct.replace(/\s/g, '').toLowerCase();
+      if (ns === nc) { flagCaptured(submitted); return; }
       showToast('Incorrect — try again', false);
       input.style.borderColor = 'var(--danger)';
       setTimeout(() => input.style.borderColor = '', 1500);
@@ -1150,53 +1039,31 @@ Answer questions clearly and concisely. If they ask something off-topic, gently 
 
   async function flagCaptured(payload) {
     currentChallengePassed = true;
-    showToast('?? Flag captured!', true);
-
-    try {
-      if (currentSessionId) await P002Api.captureFlag(currentSessionId);
-    } catch(e) { /* non-critical */ }
-
-    // Go to debrief
+    showToast('🏴 Flag captured!', true);
+    try { if (currentSessionId) await P002Api.captureFlag(currentSessionId); } catch(e) {}
     openDebrief(payload);
   }
 
-  function backToReader() {
-    closeHintDrawer();
-    showScreen('readerScreen');
-  }
+  function backToReader() { closeHintDrawer(); showScreen('readerScreen'); }
+  function skipChallenge() { showScreen('homeScreen'); }
 
-  function skipChallenge() {
-    showScreen('homeScreen');
-  }
-
-  // ==================== HINT SYSTEM ====================
+  // ==================== HINTS ====================
   function showHint() {
     const hints = sectionData?.challenge?.hints || [];
-    if (!hints.length) {
-      showToast('No hints available', false);
-      return;
-    }
-
+    if (!hints.length) { showToast('No hints available', false); return; }
     const hint = hints[currentHintIndex] || hints[hints.length - 1];
     document.getElementById('hintLabel').textContent = 'Hint ' + (currentHintIndex + 1) + ' of ' + hints.length;
     document.getElementById('hintText').innerHTML = formatBodyText(hint);
-
     document.getElementById('hintDrawer').classList.add('visible');
   }
 
   function nextHint() {
     const hints = sectionData?.challenge?.hints || [];
-    if (currentHintIndex < hints.length - 1) {
-      currentHintIndex++;
-      showHint();
-    } else {
-      closeHintDrawer();
-    }
+    if (currentHintIndex < hints.length - 1) { currentHintIndex++; showHint(); }
+    else closeHintDrawer();
   }
 
-  function closeHintDrawer() {
-    document.getElementById('hintDrawer').classList.remove('visible');
-  }
+  function closeHintDrawer() { document.getElementById('hintDrawer').classList.remove('visible'); }
 
   function openChallengeChat() {
     chatMode = 'free';
@@ -1205,47 +1072,30 @@ Answer questions clearly and concisely. If they ask something off-topic, gently 
     document.getElementById('chatHeaderTitle').textContent = 'Challenge Help';
     document.getElementById('debriefBanner').style.display = 'none';
     document.getElementById('chatContinueBtn').style.display = 'none';
-
-    const msgs = document.getElementById('messages');
-    msgs.innerHTML = '';
+    document.getElementById('messages').innerHTML = '';
     showScreen('chatScreen');
-
-    const systemPrompt = buildChallengeChatSystemPrompt();
-    callClaude(systemPrompt, [{ role: 'user', content: "I'm stuck on the challenge. Give me a hint without giving away the answer." }]);
+    callClaude(buildChallengeChatSystemPrompt(), [{ role: 'user', content: "I'm stuck on the challenge. Give me a hint without giving away the answer." }]);
   }
 
   function buildChallengeChatSystemPrompt() {
     const ch = sectionData?.challenge;
     const aiContext = sectionData?.ai_context || '';
-    return `You are an AI tutor helping a student with a cybersecurity challenge. Context: ${aiContext}
-
-Challenge: ${ch?.title || ''}. Description: ${ch?.description || ''}
-
-Give hints that guide without giving the answer directly. If they're really stuck after 3 messages, you can give more direct guidance. Keep responses concise.`;
+    return `You are an AI tutor helping a student with a cybersecurity challenge. Context: ${aiContext}\nChallenge: ${ch?.title || ''}. Description: ${ch?.description || ''}\nGive hints that guide without giving the answer directly. Keep responses concise.`;
   }
 
   // ==================== DEBRIEF ====================
   function openDebrief(payload) {
     chatMode = 'debrief';
     chatHistory = [];
-
     document.getElementById('chatHeaderLabel').textContent = 'Debrief';
     document.getElementById('chatHeaderTitle').textContent = sectionData?.meta?.title || 'Section complete';
     document.getElementById('chatContinueBtn').style.display = 'block';
-
-    // Show debrief banner
     document.getElementById('debriefBanner').style.display = 'block';
     document.getElementById('debriefBannerTitle').textContent = 'Flag captured — ' + P002Security.escapeHtml(payload);
     document.getElementById('debriefBannerSub').textContent = (sectionData?.meta?.title || '') + ' complete';
-
-    const msgs = document.getElementById('messages');
-    msgs.innerHTML = '';
+    document.getElementById('messages').innerHTML = '';
     showScreen('chatScreen');
-
-    // Adjust messages padding to account for debrief banner
-    msgs.style.paddingTop = '60px';
-
-    // Auto-debrief
+    document.getElementById('messages').style.paddingTop = '60px';
     const systemPrompt = buildDebriefSystemPrompt(payload);
     const userMsg = `I just captured the flag with payload: "${payload}". Debrief me on what I did and why it worked.`;
     chatHistory.push({ role: 'user', content: userMsg });
@@ -1255,11 +1105,7 @@ Give hints that guide without giving the answer directly. If they're really stuc
   function buildDebriefSystemPrompt(payload) {
     const ch = sectionData?.challenge;
     const aiContext = sectionData?.ai_context || '';
-    return `You are an AI tutor debriefing a student after they solved a cybersecurity challenge. Context: ${aiContext}
-
-The student submitted payload: "${payload}". Flag: "${ch?.flag || ''}".
-
-Explain in 3-4 sentences: what their payload did, why it worked at the SQL/code level, and the real-world impact. Then offer to go deeper on any aspect. Be direct, no filler.`;
+    return `You are an AI tutor debriefing a student after they solved a cybersecurity challenge. Context: ${aiContext}\nThe student submitted payload: "${payload}". Flag: "${ch?.flag || ''}".\nExplain in 3-4 sentences: what their payload did, why it worked at the SQL/code level, and the real-world impact. Then offer to go deeper on any aspect. Be direct, no filler.`;
   }
 
   function continueAfterDebrief() {
@@ -1268,30 +1114,24 @@ Explain in 3-4 sentences: what their payload did, why it worked at the SQL/code 
     showScreen('homeScreen');
   }
 
-  // ==================== CHAT (shared) ====================
+  // ==================== CHAT ====================
   async function callClaude(systemPrompt, messages) {
     document.getElementById('sendBtn').disabled = true;
     showTyping();
-
     try {
       const sig = await P002Api.signPrompt(systemPrompt);
       const trimmed = messages.slice(-20);
       const reply = await P002Api.callClaude(systemPrompt, trimmed, sig);
       removeTyping();
-
       chatHistory.push({ role: 'assistant', content: reply });
       addMessage('assistant', reply);
-
-      // Add quick reply chips for debrief
       if (chatMode === 'debrief' && chatHistory.length <= 3) {
         addChatChips(['How do I prevent this?', "What's the real-world impact?", 'Go deeper on the query']);
       }
-
     } catch(e) {
       removeTyping();
       showToast('Error: ' + P002Security.escapeHtml(e.message));
     }
-
     document.getElementById('sendBtn').disabled = false;
     document.getElementById('userInput').focus();
   }
@@ -1300,21 +1140,15 @@ Explain in 3-4 sentences: what their payload did, why it worked at the SQL/code 
     const input = document.getElementById('userInput');
     const text = input.value.trim();
     if (!text || document.getElementById('sendBtn').disabled) return;
-
     const sanitized = P002Security.sanitizeInput(text, 2000);
     addMessage('user', sanitized);
     input.value = '';
     input.style.height = 'auto';
-
     chatHistory.push({ role: 'user', content: sanitized });
-
-    // Remove chips
     document.querySelectorAll('.chat-chips').forEach(c => c.remove());
-
     const systemPrompt = chatMode === 'debrief'
       ? buildDebriefSystemPrompt(sectionData?.challenge?.flag || '')
       : buildFreeChatSystemPrompt();
-
     callClaude(systemPrompt, chatHistory);
   }
 
@@ -1342,7 +1176,6 @@ Explain in 3-4 sentences: what their payload did, why it worked at the SQL/code 
     msgs.scrollTop = msgs.scrollHeight;
   }
 
-  // ==================== MESSAGE RENDERING ====================
   function addMessage(role, content) {
     const msgs = document.getElementById('messages');
     const div = document.createElement('div');
@@ -1397,11 +1230,9 @@ Explain in 3-4 sentences: what their payload did, why it worked at the SQL/code 
     return text;
   }
 
-  // ==================== LEGACY FALLBACK ====================
-  // For old-schema sections — keeps basic chat working
+  // ==================== LEGACY ====================
   function startLegacySession() {
     showToast('Legacy section format — basic chat mode', false);
-    // Minimal fallback: open a free chat screen
     chatMode = 'free';
     chatHistory = [];
     document.getElementById('chatHeaderLabel').textContent = 'Session';
@@ -1412,10 +1243,185 @@ Explain in 3-4 sentences: what their payload did, why it worked at the SQL/code 
     document.getElementById('messages').style.paddingTop = '';
     showScreen('chatScreen');
     document.getElementById('endBtn').style.display = 'block';
-
     const sp = (sectionData?.system_prompt || 'You are a cybersecurity instructor.') +
       (sectionData?.reading_material ? '\n\nREADING MATERIAL:\n' + sectionData.reading_material : '');
     callClaude(sp, [{ role: 'user', content: 'Begin the lesson.' }]);
+  }
+
+  // ==================== LIBRARY ====================
+
+  function openLibrary() {
+    // Reset to idle state
+    document.getElementById('libIdle').style.display = 'flex';
+    document.getElementById('libSearching').style.display = 'none';
+    document.getElementById('libInputIdle').value = '';
+    document.getElementById('libGoBtn').style.display = 'none';
+
+    // Build suggestion pills if not already done
+    const pillsEl = document.getElementById('libPills');
+    if (pillsEl && !pillsEl.children.length) {
+      LIB_SUGGESTIONS.forEach(s => {
+        const pill = document.createElement('div');
+        pill.className = 'lib-pill';
+        pill.textContent = s;
+        pill.onclick = () => { document.getElementById('libInputIdle').value = s; librarySearch(s); };
+        pillsEl.appendChild(pill);
+      });
+    }
+
+    showScreen('libraryScreen');
+  }
+
+  function closeLibrary() {
+    libraryReset();
+    showScreen('homeScreen');
+  }
+
+  async function librarySearch(query) {
+    if (!query || !query.trim()) return;
+    query = query.trim();
+
+    // Switch to searching state
+    document.getElementById('libIdle').style.display = 'none';
+    document.getElementById('libSearching').style.display = 'flex';
+    document.getElementById('libInputCompact').value = query;
+    document.getElementById('libResultCount').style.display = 'none';
+    document.getElementById('libClearBtn').style.display = 'none';
+    document.getElementById('libDots').style.display = 'flex';
+
+    // Animate spark
+    const spark = document.getElementById('libCompactSpark');
+    if (spark) spark.style.animation = 'libSparkPulse 1s ease infinite';
+
+    // Animate dots
+    let dotStep = 0;
+    clearInterval(libDotInterval);
+    libDotInterval = setInterval(() => {
+      dotStep = (dotStep + 1) % 4;
+      [0,1,2].forEach(i => {
+        const d = document.getElementById('ld' + i);
+        if (d) d.style.opacity = dotStep > i ? '1' : '0.15';
+      });
+    }, 280);
+
+    // Loading state
+    const resultsEl = document.getElementById('libResults');
+    resultsEl.innerHTML =
+      '<div class="lib-loading-state">' +
+        '<svg width="30" height="30" viewBox="0 0 52 52" overflow="visible" style="animation:libSparkPulse 1.2s ease infinite">' +
+          '<line x1="26" y1="4" x2="26" y2="48" stroke="rgba(255,77,77,0.35)" stroke-width="4.5" stroke-linecap="round"/>' +
+          '<line x1="4" y1="26" x2="48" y2="26" stroke="rgba(255,77,77,0.35)" stroke-width="4.5" stroke-linecap="round"/>' +
+          '<line x1="9.5" y1="9.5" x2="42.5" y2="42.5" stroke="rgba(255,77,77,0.2)" stroke-width="3.5" stroke-linecap="round"/>' +
+          '<line x1="42.5" y1="9.5" x2="9.5" y2="42.5" stroke="rgba(255,77,77,0.2)" stroke-width="3.5" stroke-linecap="round"/>' +
+          '<circle cx="26" cy="26" r="5.5" fill="rgba(255,77,77,0.35)"/>' +
+        '</svg>' +
+        '<div class="lib-loading-title">Searching...</div>' +
+      '</div>';
+
+    // Call fetch.js
+    let books = [];
+    try {
+      books = await P002Fetch.searchLibrary(query);
+    } catch(e) {
+      console.warn('[Library] Search failed:', e.message);
+    }
+
+    // Stop loading
+    clearInterval(libDotInterval);
+    document.getElementById('libDots').style.display = 'none';
+    document.getElementById('libClearBtn').style.display = 'flex';
+    if (spark) spark.style.animation = '';
+
+    // Show count
+    document.getElementById('libResultCount').style.display = 'flex';
+    document.getElementById('libResultLabel').textContent =
+      books.length + ' RESULTS · PUBLIC DOMAIN · PRE-1928';
+
+    renderLibraryResults(books, resultsEl);
+  }
+
+  function renderLibraryResults(books, container) {
+    container.innerHTML = '';
+
+    if (!books.length) {
+      container.innerHTML =
+        '<div class="lib-empty">' +
+          '<div class="lib-empty-icon">📚</div>' +
+          '<div class="lib-empty-title">No results</div>' +
+          '<div class="lib-empty-sub">Try a different search term. Only pre-1928 public domain content is shown.</div>' +
+        '</div>';
+      return;
+    }
+
+    books.forEach((book, i) => {
+      const row = document.createElement('div');
+      row.className = 'book-row';
+      row.style.animationDelay = (i * 55) + 'ms';
+
+      const subjectTag = book.subjects?.[0]
+        ? '<div class="book-tag">' + P002Security.escapeHtml(book.subjects[0]) + '</div>'
+        : '';
+      const sourceTag = '<div class="book-tag">' + P002Security.escapeHtml(book.source || '') + '</div>';
+      const pdTag = '<div class="book-tag pd">Public domain</div>';
+
+      const bookJson = JSON.stringify(book).replace(/"/g, '&quot;');
+
+      row.innerHTML =
+        '<div class="book-cover">' +
+          '<svg style="opacity:0.1" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>' +
+          '<div class="book-cover-stripe"></div>' +
+        '</div>' +
+        '<div class="book-info">' +
+          '<div class="book-title">' + P002Security.escapeHtml(book.title) + '</div>' +
+          '<div class="book-author">' + P002Security.escapeHtml(book.author) + (book.year ? ' · ' + book.year : '') + '</div>' +
+          '<div class="book-tags">' + subjectTag + pdTag + '</div>' +
+        '</div>' +
+        '<button class="book-import" id="import-' + P002Security.escapeHtml(book.id) + '" onclick="P002App.importBook(' + bookJson + ')">+ Import</button>';
+
+      container.appendChild(row);
+    });
+
+    // Spacer
+    const spacer = document.createElement('div');
+    spacer.style.height = '60px';
+    container.appendChild(spacer);
+  }
+
+  async function importBook(book) {
+    const safeId = book.id ? book.id.replace(/[^a-zA-Z0-9-_]/g, '') : '';
+    const btn = document.getElementById('import-' + safeId);
+    if (!btn || btn.classList.contains('imported') || btn.classList.contains('importing')) return;
+
+    btn.classList.add('importing');
+    btn.innerHTML = '<div class="book-spinner"></div>';
+
+    // TODO: Replace simulation with real edge function call:
+    // await P002Api.callEdgeFunction('generate-from-library', {
+    //   title: book.title,
+    //   author: book.author,
+    //   textUrl: book.textUrl,
+    //   userId: currentUser.id
+    // });
+
+    // Simulate for now
+    await new Promise(r => setTimeout(r, 1800));
+
+    btn.classList.remove('importing');
+    btn.classList.add('imported');
+    btn.textContent = '✓ Added';
+
+    showToast('📚 ' + book.title.slice(0, 30) + (book.title.length > 30 ? '...' : '') + ' added to library', true);
+  }
+
+  function libraryReset() {
+    clearInterval(libDotInterval);
+    document.getElementById('libIdle').style.display = 'flex';
+    document.getElementById('libSearching').style.display = 'none';
+    document.getElementById('libInputIdle').value = '';
+    document.getElementById('libGoBtn').style.display = 'none';
+    document.getElementById('libInputCompact').value = '';
+    document.getElementById('libResults').innerHTML = '';
+    document.getElementById('libResultCount').style.display = 'none';
   }
 
   // ==================== UI HELPERS ====================
@@ -1474,7 +1480,6 @@ Explain in 3-4 sentences: what their payload did, why it worked at the SQL/code 
     backToSectionPreview,
     startReading,
     endReading,
-    // Sticky next + KC flow
     stickyNextTapped,
     skipKcGoNext,
     startKnowledgeCheck,
@@ -1485,7 +1490,6 @@ Explain in 3-4 sentences: what their payload did, why it worked at the SQL/code 
     kcRetry,
     kcReviewSection,
     goToNextSection,
-    // Reader drawer
     handlePopupAction,
     closeDrawer,
     sendDrawerMessage,
@@ -1506,6 +1510,13 @@ Explain in 3-4 sentences: what their payload did, why it worked at the SQL/code 
     autoResize,
     showAdmin,
     showToast,
+    // Library
+    openLibrary,
+    closeLibrary,
+    librarySearch,
+    renderLibraryResults,
+    importBook,
+    libraryReset,
   };
 
 })();
