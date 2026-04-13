@@ -10,10 +10,6 @@ window.P002App = (() => {
   let currentUser = null;
   let sectionData = null;
   let currentSessionId = null;
-  let selectedModule = null;
-  let currentModule = null;
-  let currentSectionMeta = null;
-  let selectedSection = null;
 
   // Reader state
   let readerScrollHandler = null;
@@ -70,7 +66,154 @@ window.P002App = (() => {
       document.getElementById('adminBtn').style.display = 'block';
     }
     showScreen('homeScreen');
-    loadModuleCatalog();
+    loadMyCourses();
+  }
+
+  // ==================== COURSE CATALOG ====================
+  async function loadMyCourses() {
+    const grid = document.getElementById('moduleGrid');
+    if (!grid) return;
+
+    grid.innerHTML = '<div class="skeleton-card"><div class="skeleton-line" style="height:10px;width:35%;"></div><div class="skeleton-line" style="height:16px;width:65%;margin-top:8px;"></div></div>';
+
+    try {
+      const { courses } = await P002Api.getMyCourses();
+
+      if (!courses || !courses.length) {
+        grid.innerHTML = '<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">No courses yet — browse the library or upload a document to get started.</div>';
+        return;
+      }
+
+      const byStatus = {
+        generating: courses.filter(c => c.status === 'generating' || c.status === 'partial'),
+        ready:      courses.filter(c => c.status === 'ready'),
+        error:      courses.filter(c => c.status === 'error'),
+      };
+
+      grid.innerHTML = '';
+
+      Object.entries(byStatus).forEach(([status, list]) => {
+        if (!list.length) return;
+        const labels = { generating: 'Generating', ready: 'Your Courses', error: 'Failed' };
+        const group = document.createElement('div');
+        group.style.cssText = 'margin-bottom:8px;';
+        const label = document.createElement('div');
+        label.style.cssText = 'padding:16px 16px 8px;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;color:var(--text-dim);';
+        label.textContent = labels[status];
+        group.appendChild(label);
+        list.forEach(c => group.appendChild(buildCourseCard(c)));
+        grid.appendChild(group);
+      });
+
+    } catch(e) {
+      grid.innerHTML = '<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">Error loading courses: ' + P002Security.escapeHtml(e.message) + '</div>';
+    }
+  }
+
+  function buildCourseCard(course) {
+    const card = document.createElement('div');
+    card.style.cssText = 'margin:0 16px 8px;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color 0.15s,transform 0.15s;';
+
+    const diffColors = { beginner: 'var(--success)', intermediate: 'var(--warn)', advanced: 'var(--accent)' };
+    const statusColors = { ready: '', generating: 'var(--warn)', error: 'var(--danger)', partial: 'var(--warn)' };
+    const icon = course.icon || '📚';
+    const color = course.color || 'var(--accent)';
+
+    card.innerHTML =
+      '<div style="padding:14px 16px;display:flex;align-items:center;gap:14px;">' +
+        '<div style="width:44px;height:44px;border-radius:10px;background:' + color + '22;border:1px solid ' + color + '44;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">' + icon + '</div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:' + (diffColors[course.difficulty] || 'var(--warn)') + ';margin-bottom:4px;">' + (course.difficulty || '') + '</div>' +
+          '<div style="font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--text);line-height:1.2;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + P002Security.escapeHtml(course.title) + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);">' +
+            (course.status === 'generating' ? '⏳ Generating...' :
+             course.status === 'error' ? '✗ Generation failed' :
+             (course.section_count || 0) + ' sections' + (course.category ? ' · ' + course.category : '')) +
+          '</div>' +
+        '</div>' +
+        '<div style="color:var(--text-dim);font-size:16px;">' + (course.status === 'generating' ? '⏳' : '›') + '</div>' +
+      '</div>';
+
+    card.addEventListener('mouseenter', () => { card.style.borderColor = 'var(--border2)'; card.style.transform = 'translateX(2px)'; });
+    card.addEventListener('mouseleave', () => { card.style.borderColor = 'var(--border)'; card.style.transform = ''; });
+    if (course.status === 'ready') {
+      card.addEventListener('click', () => openCourse(course.id));
+    }
+    return card;
+  }
+
+  async function openCourse(courseId) {
+    try {
+      const { course, sections } = await P002Api.getCourse(courseId);
+      // Store current course data
+      window._currentCourse = { course, sections };
+      // Render module detail screen using DB data
+      renderCourseDetail(course, sections);
+      showScreen('moduleScreen');
+    } catch(e) {
+      showToast('Error loading course: ' + e.message, false);
+    }
+  }
+
+  function renderCourseDetail(course, sections) {
+    document.getElementById('moduleDetailCategory').textContent = (course.category || '') + (course.difficulty ? ' · ' + course.difficulty : '');
+    document.getElementById('moduleDetailTitle').textContent = course.title;
+    document.getElementById('moduleDetailDesc').textContent = course.description || '';
+    document.getElementById('moduleDetailStats').innerHTML =
+      '<div class="module-stat"><span class="module-stat-value">' + sections.length + '</span><span class="module-stat-label">Sections</span></div>';
+
+    const list = document.getElementById('moduleSectionList');
+    list.innerHTML = '';
+    sections.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.className = 'section-row';
+      row.innerHTML =
+        '<div class="section-num">' + String(i + 1).padStart(2, '0') + '</div>' +
+        '<div class="section-info">' +
+          '<div class="section-title">' + P002Security.escapeHtml(s.title) + '</div>' +
+          '<div class="section-meta-row">' +
+            '<span class="section-time">⏱ ' + (s.minutes || '?') + ' min</span>' +
+            '<span class="section-diff ' + (s.difficulty || 'beginner') + '">' + (s.difficulty || '') + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="section-chevron">›</div>';
+      row.addEventListener('click', () => openSectionFromDB(s, course, sections));
+      list.appendChild(row);
+    });
+  }
+
+  function openSectionFromDB(section, course, sections) {
+    // Map DB section to sectionData format the reader expects
+    sectionData = {
+      meta: {
+        title:          section.title,
+        section:        section.section_number,
+        total_sections: sections.length,
+        module:         course.title,
+      },
+      content:         section.content_json || [],
+      knowledge_check: section.knowledge_check_json || { questions: [] },
+      challenge:       section.challenge_json || null,
+      ai_context:      section.ai_context || '',
+    };
+
+    // Store for navigation
+    window._currentSectionId = section.id;
+    window._currentCourseId  = course.id;
+
+    document.getElementById('sectionBackLabel').textContent = course.title;
+    document.getElementById('sectionPreviewMeta').textContent =
+      'Section ' + section.section_number + ' of ' + sections.length +
+      ' · ' + (section.difficulty || '') +
+      ' · ' + (section.minutes || '?') + ' min';
+    document.getElementById('sectionPreviewTitle').textContent = section.title;
+    document.getElementById('sectionPreviewDesc').textContent = section.description || '';
+    document.getElementById('sectionPreviewBody').innerHTML = '';
+    document.getElementById('sectionStartBtn').disabled = false;
+    document.getElementById('sectionStartBtn').textContent = 'Start Reading →';
+    document.getElementById('sectionStartStatus').textContent = '';
+
+    showScreen('sectionScreen');
   }
 
   // ==================== AUTH ====================
@@ -124,210 +267,10 @@ window.P002App = (() => {
   }
 
   // ==================== HOME SCREEN ====================
-  const MODULE_INDEX_PATH = 'index.json';
-
-  const CATEGORY_ICONS = {
-    'Web Fundamentals': '🌐',
-    'Web Exploitation': '⚡',
-    'Network': '🔗',
-    'Defense': '🛡',
-    'Systems': '⚙',
-    'Other': '📁',
-  };
-
-  async function loadModuleCatalog() {
-    const grid = document.getElementById('moduleGrid');
-    if (!grid) return;
-
-    try {
-      let modules = [];
-      try {
-        const text = await P002Api.downloadFile(MODULE_INDEX_PATH);
-        const parsed = JSON.parse(text);
-        modules = parsed.modules || [];
-      } catch(e) {
-        const items = await P002Api.listBucket('');
-        const folders = items.filter(f => !f.metadata && !f.name.startsWith('.'));
-        modules = folders.map(f => ({
-          key: f.name,
-          title: f.name.replace(/module_|_/g, ' ').trim(),
-          category: 'Other',
-          difficulty: 'intermediate',
-          section_count: 0,
-          estimated_hours: 0,
-          icon: '📁'
-        }));
-      }
-
-      if (!modules.length) {
-        grid.innerHTML = '<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">No modules found. Upload content via the admin panel.</div>';
-        return;
-      }
-
-      const categories = {};
-      modules.forEach(m => {
-        const cat = m.category || 'Other';
-        if (!categories[cat]) categories[cat] = [];
-        categories[cat].push(m);
-      });
-
-      grid.innerHTML = '';
-
-      Object.entries(categories).forEach(([cat, mods]) => {
-        const group = document.createElement('div');
-        group.style.cssText = 'margin-bottom:8px;';
-        const label = document.createElement('div');
-        label.style.cssText = 'padding:16px 16px 8px;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;color:var(--text-dim);';
-        label.textContent = cat;
-        group.appendChild(label);
-        mods.forEach(m => group.appendChild(buildIndexCard(m)));
-        grid.appendChild(group);
-      });
-
-    } catch(e) {
-      grid.innerHTML = '<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">Error: ' + P002Security.escapeHtml(e.message) + '</div>';
-    }
-  }
-
-  function buildIndexCard(m) {
-    const card = document.createElement('div');
-    card.style.cssText = 'margin:0 16px 8px;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color 0.15s,transform 0.15s;';
-
-    const icon = m.icon || CATEGORY_ICONS[m.category] || '📁';
-    const secs = m.section_count || 0;
-    const hrs = m.estimated_hours || 0;
-    const diff = m.difficulty || 'intermediate';
-    const diffColors = { beginner: 'var(--success)', intermediate: 'var(--warn)', advanced: 'var(--accent)' };
-
-    card.innerHTML =
-      '<div style="padding:14px 16px;display:flex;align-items:center;gap:14px;">' +
-        '<div style="width:44px;height:44px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(255,77,77,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">' + icon + '</div>' +
-        '<div style="flex:1;min-width:0;">' +
-          '<div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:' + (diffColors[diff] || 'var(--warn)') + ';margin-bottom:4px;">' + diff + '</div>' +
-          '<div style="font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--text);line-height:1.2;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + P002Security.escapeHtml(m.title) + '</div>' +
-          '<div style="font-size:11px;color:var(--text-muted);">' + (secs > 0 ? secs + ' sections' : 'Loading...') + (hrs > 0 ? ' · ' + hrs + 'h' : '') + '</div>' +
-        '</div>' +
-        '<div style="color:var(--text-dim);font-size:16px;">›</div>' +
-      '</div>';
-
-    card.addEventListener('mouseenter', () => { card.style.borderColor = 'var(--border2)'; card.style.transform = 'translateX(2px)'; });
-    card.addEventListener('mouseleave', () => { card.style.borderColor = 'var(--border)'; card.style.transform = ''; });
-    card.addEventListener('click', () => openModule(m.key || m.module_key));
-    return card;
-  }
 
   // ==================== MODULE / SECTION NAV ====================
-  async function openModule(moduleKey) {
-    selectedModule = moduleKey;
-    showScreen('moduleScreen');
 
-    document.getElementById('moduleDetailTitle').textContent = 'Loading...';
-    document.getElementById('moduleDetailDesc').textContent = '';
-    document.getElementById('moduleDetailCategory').textContent = '';
-    document.getElementById('moduleDetailStats').innerHTML = '';
-    document.getElementById('moduleSectionList').innerHTML = '<div style="padding:20px 16px;color:var(--text-muted);font-size:13px;">Loading sections...</div>';
-
-    try {
-      const text = await P002Api.downloadFile(moduleKey + '/manifest.json');
-      const manifest = JSON.parse(text);
-      currentModule = manifest;
-      renderModuleDetail(manifest);
-    } catch(e) {
-      document.getElementById('moduleDetailTitle').textContent = 'Failed to load';
-      document.getElementById('moduleSectionList').innerHTML = '<div style="padding:20px 16px;color:var(--danger);font-size:13px;">' + P002Security.escapeHtml(e.message) + '</div>';
-    }
-  }
-
-  function renderModuleDetail(manifest) {
-    const totalMins = manifest.sections.reduce((a, s) => a + (s.minutes || 0), 0);
-    const hours = totalMins > 0 ? (totalMins / 60).toFixed(1) : (manifest.estimated_hours || '?');
-    const flags = manifest.sections.filter(s => s.has_flag).length;
-
-    document.getElementById('moduleDetailCategory').textContent = (manifest.category || '') + (manifest.difficulty ? ' · ' + manifest.difficulty : '');
-    document.getElementById('moduleDetailTitle').textContent = manifest.title;
-    document.getElementById('moduleDetailDesc').textContent = manifest.description || '';
-    document.getElementById('moduleDetailStats').innerHTML =
-      '<div class="module-stat"><span class="module-stat-value">' + manifest.sections.length + '</span><span class="module-stat-label">Sections</span></div>' +
-      '<div class="module-stat"><span class="module-stat-value">' + hours + 'h</span><span class="module-stat-label">Estimated</span></div>' +
-      (flags > 0 ? '<div class="module-stat"><span class="module-stat-value">' + flags + '</span><span class="module-stat-label">Flags</span></div>' : '');
-
-    const list = document.getElementById('moduleSectionList');
-    list.innerHTML = '';
-
-    manifest.sections.forEach((s, i) => {
-      const row = document.createElement('div');
-      row.className = 'section-row' + (s.has_flag ? ' has-flag' : '');
-      row.innerHTML =
-        '<div class="section-num">' + String(i + 1).padStart(2, '0') + '</div>' +
-        '<div class="section-info">' +
-          '<div class="section-title">' + P002Security.escapeHtml(s.title) + '</div>' +
-          '<div class="section-meta-row">' +
-            '<span class="section-time">⏱ ' + (s.minutes || '?') + ' min</span>' +
-            '<span class="section-diff ' + (s.difficulty || 'beginner') + '">' + (s.difficulty || '') + '</span>' +
-          '</div>' +
-        '</div>' +
-        '<div class="section-flag">⚑</div>' +
-        '<div class="section-chevron">›</div>';
-      row.addEventListener('click', () => openSectionPreview(s, i, manifest));
-      list.appendChild(row);
-    });
-  }
-
-  async function openSectionPreview(sectionMeta, idx, manifest) {
-    currentSectionMeta = sectionMeta;
-    selectedSection = manifest.module_key + '/' + sectionMeta.file;
-    sectionData = null;
-
-    document.getElementById('sectionBackLabel').textContent = manifest.title;
-    document.getElementById('sectionPreviewMeta').textContent =
-      'Section ' + (idx + 1) + ' of ' + manifest.sections.length +
-      ' · ' + (sectionMeta.difficulty || '') +
-      ' · ' + (sectionMeta.minutes || '?') + ' min';
-    document.getElementById('sectionPreviewTitle').textContent = sectionMeta.title;
-    document.getElementById('sectionPreviewDesc').textContent = sectionMeta.description || '';
-
-    const body = document.getElementById('sectionPreviewBody');
-    body.innerHTML = '';
-
-    if (sectionMeta.has_flag) {
-      const box = document.createElement('div');
-      box.className = 'section-challenge-box';
-      box.innerHTML =
-        '<div class="section-challenge-label">⚑ Practice Challenge included</div>' +
-        '<div class="section-challenge-text">' + P002Security.escapeHtml(sectionMeta.practice_question || 'Hands-on challenge at the end of this section') + '</div>';
-      body.appendChild(box);
-    }
-
-    showScreen('sectionScreen');
-
-    const btn = document.getElementById('sectionStartBtn');
-    const status = document.getElementById('sectionStartStatus');
-    btn.disabled = true;
-    status.textContent = 'Loading section...';
-
-    try {
-      const text = await P002Api.downloadFile(selectedSection);
-      const validation = P002Security.validateLessonJson(text);
-      if (!validation.ok) {
-        status.textContent = '✗ ' + validation.errors[0];
-        return;
-      }
-      sectionData = validation.data;
-      btn.disabled = false;
-      status.textContent = '';
-      btn.textContent = validation.schema === 'reader' ? 'Start Reading →' : 'Start Session →';
-    } catch(e) {
-      status.textContent = '✗ Failed to load: ' + P002Security.escapeHtml(e.message);
-    }
-  }
-
-  function backToHome() { currentModule = null; showScreen('homeScreen'); }
-  function backToModule() { currentSectionMeta = null; sectionData = null; showScreen('moduleScreen'); }
-  function backToSectionPreview() {
-    closeDrawer();
-    removeTextSelectionHandler();
-    showScreen('sectionScreen');
-  }
+  function backToHome() { showScreen('homeScreen'); }
   function showAdmin() { window.location.href = '/project-002/admin.html'; }
 
   // ==================== START READING ====================
@@ -368,7 +311,7 @@ window.P002App = (() => {
       readerContent.addEventListener('scroll', readerScrollHandler);
     }
 
-    const nextMeta = currentModule?.sections?.[currentModule.sections.indexOf(currentSectionMeta) + 1];
+    const nextMeta = null; // TODO: wire to DB section list
     const nextTitle = document.getElementById('stickyNextTitle');
     if (nextTitle) nextTitle.textContent = nextMeta?.title || 'Module complete';
 
@@ -414,15 +357,9 @@ window.P002App = (() => {
   function skipKcGoNext() { goToNextSection(); }
 
   function goToNextSection() {
-    if (!currentModule || !currentSectionMeta) { showScreen('moduleScreen'); return; }
-    const sections = currentModule.sections;
-    const idx = sections.findIndex(s => s.file === currentSectionMeta.file);
-    if (idx === -1 || idx >= sections.length - 1) {
-      showScreen('moduleScreen');
-      return;
-    }
-    const nextMeta = sections[idx + 1];
-    openSectionPreview(nextMeta, idx + 1, currentModule);
+    // TODO: wire to DB-based section navigation
+    // For now return to home after last section
+    showScreen('homeScreen');
   }
 
   // ==================== KNOWLEDGE CHECK ====================
@@ -655,8 +592,7 @@ window.P002App = (() => {
     document.getElementById('kcResultsMissed').textContent = total - kcScore;
 
     const nextBtn = document.getElementById('kcResultsNextBtn');
-    const hasNext = currentModule?.sections &&
-      currentModule.sections.findIndex(s => s.file === currentSectionMeta?.file) < currentModule.sections.length - 1;
+    const hasNext = false; // TODO: wire to DB section list
     nextBtn.textContent = hasNext ? 'Next Section →' : 'Back to Module';
     nextBtn.onclick = hasNext ? goToNextSection : () => showScreen('moduleScreen');
 
@@ -1231,22 +1167,6 @@ window.P002App = (() => {
   }
 
   // ==================== LEGACY ====================
-  function startLegacySession() {
-    showToast('Legacy section format — basic chat mode', false);
-    chatMode = 'free';
-    chatHistory = [];
-    document.getElementById('chatHeaderLabel').textContent = 'Session';
-    document.getElementById('chatHeaderTitle').textContent = sectionData?.lesson?.title || 'Lesson';
-    document.getElementById('debriefBanner').style.display = 'none';
-    document.getElementById('chatContinueBtn').style.display = 'none';
-    document.getElementById('messages').innerHTML = '';
-    document.getElementById('messages').style.paddingTop = '';
-    showScreen('chatScreen');
-    document.getElementById('endBtn').style.display = 'block';
-    const sp = (sectionData?.system_prompt || 'You are a cybersecurity instructor.') +
-      (sectionData?.reading_material ? '\n\nREADING MATERIAL:\n' + sectionData.reading_material : '');
-    callClaude(sp, [{ role: 'user', content: 'Begin the lesson.' }]);
-  }
 
   // ==================== LIBRARY ====================
 
@@ -1410,26 +1330,182 @@ window.P002App = (() => {
     const btn = document.getElementById('import-' + safeId);
     if (!btn || btn.classList.contains('imported') || btn.classList.contains('importing')) return;
 
+    // Show course customization prompt
+    const prefs = await showImportPrompt(book.title);
+    if (!prefs) return; // user cancelled
+
     btn.classList.add('importing');
     btn.innerHTML = '<div class="book-spinner"></div>';
 
-    // TODO: Replace with real edge function call:
-    // await P002Api.callEdgeFunction('generate-from-library', {
-    //   title:   book.title,
-    //   author:  book.author,
-    //   source:  book.source,
-    //   type:    book.type,
-    //   textUrl: book.textUrl,
-    //   userId:  currentUser.id
-    // });
+    try {
+      // Fetch source text
+      let rawText = '';
+      if (book.source === 'Wikipedia') {
+        rawText = await P002Fetch.fetchBookText(book);
+      } else if (book.source === 'Gutenberg' && book.textUrl) {
+        rawText = await P002Fetch.fetchBookText(book);
+      } else if (book.textUrl) {
+        rawText = 'Source: ' + book.textUrl + '\n\nTitle: ' + book.title + '\nAuthor: ' + book.author + '\n\n' + (book.description || '');
+      } else {
+        throw new Error('No text source available for this item');
+      }
 
-    await new Promise(r => setTimeout(r, 1800));
+      if (!rawText || rawText.length < 100) throw new Error('Not enough content to generate a course');
 
-    btn.classList.remove('importing');
-    btn.classList.add('imported');
-    btn.innerHTML = '&#10003; Added';
+      // Append user preferences to raw text so generation prompt picks them up
+      const prefContext = '\n\n=== COURSE CUSTOMIZATION ===\n' +
+        (prefs.focus    ? 'Focus on: ' + prefs.focus + '\n' : '') +
+        (prefs.level    ? 'Target level: ' + prefs.level + '\n' : '') +
+        (prefs.purpose  ? 'Purpose: ' + prefs.purpose + '\n' : '') +
+        (prefs.include  ? 'Must include: ' + prefs.include + '\n' : '');
 
-    showToast('&#128218; ' + book.title.slice(0, 30) + (book.title.length > 30 ? '...' : '') + ' added to library', true);
+      rawText = rawText + prefContext;
+
+      btn.innerHTML = '0%';
+
+      await P002Api.generateCourse(
+        book.title,
+        book.author,
+        book.source.toLowerCase().replace('.', ''),
+        book.textUrl || null,
+        rawText,
+        (pct, sectionTitle, done) => {
+          btn.innerHTML = pct + '%';
+          if (done) {
+            btn.classList.remove('importing');
+            btn.classList.add('imported');
+            btn.innerHTML = '&#10003; Added';
+          }
+        }
+      );
+
+      showToast('&#128218; ' + book.title.slice(0, 30) + (book.title.length > 30 ? '...' : '') + ' — course ready!', true);
+
+    } catch(e) {
+      btn.classList.remove('importing');
+      btn.innerHTML = '+ Import';
+      showToast('Failed: ' + e.message, false);
+      console.error('[importBook]', e);
+    }
+  }
+
+  // Import customization prompt modal
+  function showImportPrompt(bookTitle) {
+    return new Promise((resolve) => {
+      // Remove existing modal if any
+      const existing = document.getElementById('importPromptModal');
+      if (existing) existing.remove();
+
+      const modal = document.createElement('div');
+      modal.id = 'importPromptModal';
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;display:flex;align-items:flex-end;backdrop-filter:blur(4px);';
+
+      modal.innerHTML =
+        '<div style="background:#111013;border-radius:20px 20px 0 0;border:1px solid rgba(255,255,255,0.08);width:100%;padding:0 0 32px;max-height:85vh;overflow-y:auto;">' +
+          // Handle
+          '<div style="padding:10px 0;display:flex;justify-content:center;">' +
+            '<div style="width:36px;height:3px;background:rgba(255,255,255,0.1);border-radius:2px;"></div>' +
+          '</div>' +
+          // Header
+          '<div style="padding:8px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.06);">' +
+            '<div style="font-family:var(--font-display);font-size:17px;font-weight:800;color:var(--text);letter-spacing:-0.5px;margin-bottom:3px;">Customize your course</div>' +
+            '<div style="font-size:11px;color:var(--text-dim);">' + P002Security.escapeHtml(bookTitle) + '</div>' +
+          '</div>' +
+          // Fields
+          '<div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px;">' +
+
+            // Focus
+            '<div>' +
+              '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;">Focus <span style="color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></div>' +
+              '<input id="importFocus" placeholder="e.g. coping mechanisms, diagnosis criteria, treatment..." ' +
+                'style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-family:var(--font-body);font-size:14px;color:var(--text);outline:none;box-sizing:border-box;" />' +
+              '<div style="font-size:10px;color:var(--text-dim);margin-top:5px;">What specific aspect should this course focus on?</div>' +
+            '</div>' +
+
+            // Level
+            '<div>' +
+              '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;">Level</div>' +
+              '<div style="display:flex;gap:8px;">' +
+                ['Beginner', 'Intermediate', 'Advanced'].map(l =>
+                  '<button class="import-level-btn" data-level="' + l.toLowerCase() + '" ' +
+                  'style="flex:1;padding:9px 8px;border-radius:9px;font-family:var(--font-body);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s;' +
+                  (l === 'Beginner' ? 'background:rgba(255,77,77,0.1);border:1px solid rgba(255,77,77,0.3);color:var(--accent);' : 'background:var(--surface);border:1px solid var(--border);color:var(--text-dim);') +
+                  '">' + l + '</button>'
+                ).join('') +
+              '</div>' +
+            '</div>' +
+
+            // Purpose
+            '<div>' +
+              '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;">Purpose <span style="color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></div>' +
+              '<input id="importPurpose" placeholder="e.g. personal understanding, exam prep, professional training..." ' +
+                'style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-family:var(--font-body);font-size:14px;color:var(--text);outline:none;box-sizing:border-box;" />' +
+            '</div>' +
+
+            // Must include
+            '<div>' +
+              '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;">Must include <span style="color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></div>' +
+              '<input id="importInclude" placeholder="e.g. DBT techniques, medication info, real examples..." ' +
+                'style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-family:var(--font-body);font-size:14px;color:var(--text);outline:none;box-sizing:border-box;" />' +
+            '</div>' +
+
+          '</div>' +
+          // Actions
+          '<div style="padding:0 20px;display:flex;gap:10px;">' +
+            '<button id="importCancel" style="flex:1;background:transparent;border:1px solid var(--border);border-radius:12px;padding:14px;font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--text-muted);cursor:pointer;">Cancel</button>' +
+            '<button id="importConfirm" style="flex:2;background:var(--accent);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:15px;font-weight:800;color:#fff;cursor:pointer;">Build Course &#8594;</button>' +
+          '</div>' +
+        '</div>';
+
+      document.body.appendChild(modal);
+
+      // Level button toggle
+      let selectedLevel = 'beginner';
+      modal.querySelectorAll('.import-level-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          selectedLevel = btn.dataset.level;
+          modal.querySelectorAll('.import-level-btn').forEach(b => {
+            const active = b.dataset.level === selectedLevel;
+            b.style.background = active ? 'rgba(255,77,77,0.1)' : 'var(--surface)';
+            b.style.borderColor = active ? 'rgba(255,77,77,0.3)' : 'var(--border)';
+            b.style.color = active ? 'var(--accent)' : 'var(--text-dim)';
+          });
+        });
+      });
+
+      // Focus input auto-focus
+      setTimeout(() => document.getElementById('importFocus')?.focus(), 100);
+
+      // Cancel
+      document.getElementById('importCancel').addEventListener('click', () => {
+        modal.remove();
+        resolve(null);
+      });
+
+      // Backdrop tap = cancel
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) { modal.remove(); resolve(null); }
+      });
+
+      // Confirm
+      document.getElementById('importConfirm').addEventListener('click', () => {
+        const prefs = {
+          focus:   document.getElementById('importFocus')?.value?.trim() || '',
+          level:   selectedLevel,
+          purpose: document.getElementById('importPurpose')?.value?.trim() || '',
+          include: document.getElementById('importInclude')?.value?.trim() || '',
+        };
+        modal.remove();
+        resolve(prefs);
+      });
+
+      // Enter key on any input = confirm
+      ['importFocus', 'importPurpose', 'importInclude'].forEach(id => {
+        document.getElementById(id)?.addEventListener('keydown', e => {
+          if (e.key === 'Enter') document.getElementById('importConfirm')?.click();
+        });
+      });
+    });
   }
 
   function libraryReset() {
@@ -1491,11 +1567,11 @@ window.P002App = (() => {
     handleAuth,
     logout,
     switchTab,
-    loadModuleCatalog,
-    openModule,
+    loadMyCourses,
+    openCourse,
+    renderCourseDetail,
+    openSectionFromDB,
     backToHome,
-    backToModule,
-    openSectionPreview,
     backToSectionPreview,
     startReading,
     endReading,
@@ -1535,6 +1611,7 @@ window.P002App = (() => {
     librarySearch,
     renderLibraryResults,
     importBook,
+    showImportPrompt,
     libraryReset,
   };
 
