@@ -146,14 +146,14 @@ window.P002App = (() => {
         didLongPress = false;
         pressTimer = setTimeout(() => {
           didLongPress = true;
-          editCourse(course);
+          showCourseOptions(course);
         }, 600);
       });
       card.addEventListener('touchstart', () => {
         didLongPress = false;
         pressTimer = setTimeout(() => {
           didLongPress = true;
-          editCourse(course);
+          showCourseOptions(course);
         }, 600);
       }, { passive: true });
       card.addEventListener('mouseup', () => clearTimeout(pressTimer));
@@ -163,100 +163,63 @@ window.P002App = (() => {
     return card;
   }
 
-  function editCourse(course) {
-    const existing = document.getElementById('editCourseModal');
-    if (existing) existing.remove();
-
-    // Common emojis for quick pick
-    const emojis = ['📚','🧠','💡','🔬','⚡','🛡','🌐','💻','🔗','🧬','🏥','📖','🎯','⚙','🔐','🌿','🎓','📊','🧪','🌍'];
-
+  function showCourseOptions(course) {
     const modal = document.createElement('div');
-    modal.id = 'editCourseModal';
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;display:flex;align-items:flex-end;backdrop-filter:blur(4px);';
-
     modal.innerHTML =
-      '<div style="background:#111013;border-radius:20px 20px 0 0;border:1px solid rgba(255,255,255,0.08);width:100%;padding:0 0 32px;">' +
-        '<div style="padding:10px 0;display:flex;justify-content:center;">' +
-          '<div style="width:36px;height:3px;background:rgba(255,255,255,0.1);border-radius:2px;"></div>' +
-        '</div>' +
-        '<div style="padding:8px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.06);">' +
-          '<div style="font-family:var(--font-display);font-size:17px;font-weight:800;color:var(--text);letter-spacing:-0.5px;">Edit course</div>' +
-        '</div>' +
-        '<div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px;">' +
-          // Title
-          '<div>' +
-            '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;">Title</div>' +
-            '<input id="editCourseTitle" value="' + P002Security.escapeHtml(course.title) + '" ' +
-              'style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-family:var(--font-body);font-size:14px;color:var(--text);outline:none;box-sizing:border-box;" />' +
-          '</div>' +
-          // Emoji picker
-          '<div>' +
-            '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;">Icon</div>' +
-            '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
-              emojis.map(e =>
-                '<button class="emoji-pick-btn" data-emoji="' + e + '" style="width:38px;height:38px;border-radius:8px;font-size:18px;cursor:pointer;transition:all 0.15s;' +
-                (e === (course.icon || '📚') ? 'background:rgba(255,77,77,0.15);border:1px solid rgba(255,77,77,0.4);' : 'background:var(--surface);border:1px solid var(--border);') +
-                '">' + e + '</button>'
-              ).join('') +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-        '<div style="padding:0 20px;display:flex;gap:10px;">' +
-          '<button id="editCourseCancel" style="flex:1;background:transparent;border:1px solid var(--border);border-radius:12px;padding:14px;font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--text-muted);cursor:pointer;">Cancel</button>' +
-          '<button id="editCourseSave" style="flex:2;background:var(--accent);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:15px;font-weight:800;color:#fff;cursor:pointer;">Save</button>' +
+      '<div style="background:#111013;border-radius:20px 20px 0 0;border:1px solid rgba(255,255,255,0.08);width:100%;padding:24px 20px 36px;">' +
+        '<div style="font-family:var(--font-display);font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + P002Security.escapeHtml(course.title) + '</div>' +
+        '<div style="font-size:11px;color:var(--text-dim);margin-bottom:20px;">' + (course.section_count || 0) + ' sections · ' + (course.category || '') + '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:8px;">' +
+          '<button id="courseOptOpen" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--text);cursor:pointer;text-align:left;">&#128214; Open course</button>' +
+          '<button id="courseOptDelete" style="background:rgba(255,77,77,0.08);border:1px solid rgba(255,77,77,0.2);border-radius:12px;padding:14px;font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--accent);cursor:pointer;text-align:left;">&#128465; Delete course</button>' +
+          '<button id="courseOptCancel" style="background:transparent;border:1px solid var(--border);border-radius:12px;padding:14px;font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--text-muted);cursor:pointer;">Cancel</button>' +
         '</div>' +
       '</div>';
-
     document.body.appendChild(modal);
 
-    let selectedEmoji = course.icon || '📚';
-
-    // Emoji selection
-    modal.querySelectorAll('.emoji-pick-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        selectedEmoji = btn.dataset.emoji;
-        modal.querySelectorAll('.emoji-pick-btn').forEach(b => {
-          const active = b.dataset.emoji === selectedEmoji;
-          b.style.background = active ? 'rgba(255,77,77,0.15)' : 'var(--surface)';
-          b.style.borderColor = active ? 'rgba(255,77,77,0.4)' : 'var(--border)';
-        });
-      });
-    });
-
-    document.getElementById('editCourseCancel').addEventListener('click', () => modal.remove());
+    document.getElementById('courseOptOpen').addEventListener('click', () => { modal.remove(); openCourse(course.id); });
+    document.getElementById('courseOptCancel').addEventListener('click', () => modal.remove());
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-
-    document.getElementById('editCourseSave').addEventListener('click', async () => {
-      const newTitle = document.getElementById('editCourseTitle').value.trim();
-      if (!newTitle) return;
-      try {
-        const { error } = await P002Api.getClient()
-          .from('courses')
-          .update({ title: newTitle, icon: selectedEmoji, updated_at: new Date().toISOString() })
-          .eq('id', course.id);
-        if (error) throw error;
-        modal.remove();
-        showToast('Course updated', true);
-        loadMyCourses(); // refresh home screen
-      } catch(e) {
-        showToast('Error: ' + e.message, false);
-      }
+    document.getElementById('courseOptDelete').addEventListener('click', () => {
+      modal.remove();
+      confirmDeleteCourse(course.id, course.title);
     });
   }
 
-  async function openCourse(courseId) {
+  async function confirmDeleteCourse(courseId, title) {
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;display:flex;align-items:flex-end;backdrop-filter:blur(4px);';
+    modal.innerHTML =
+      '<div style="background:#111013;border-radius:20px 20px 0 0;border:1px solid rgba(255,255,255,0.08);width:100%;padding:24px 20px 36px;">' +
+        '<div style="font-family:var(--font-display);font-size:17px;font-weight:800;color:var(--text);margin-bottom:6px;">Delete course?</div>' +
+        '<div style="font-size:13px;color:var(--text-muted);margin-bottom:24px;">' + P002Security.escapeHtml(title) + '</div>' +
+        '<div style="display:flex;gap:10px;">' +
+          '<button id="deleteCancelBtn" style="flex:1;background:transparent;border:1px solid var(--border);border-radius:12px;padding:14px;font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--text-muted);cursor:pointer;">Cancel</button>' +
+          '<button id="deleteConfirmBtn" style="flex:1;background:rgba(255,77,77,0.15);border:1px solid rgba(255,77,77,0.3);border-radius:12px;padding:14px;font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--accent);cursor:pointer;">Delete</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+
+    document.getElementById('deleteCancelBtn').addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    document.getElementById('deleteConfirmBtn').addEventListener('click', async () => {
+      modal.remove();
+      await deleteCourse(courseId);
+    });
+  }
+
+  async function deleteCourse(courseId) {
     try {
-      const { course, sections } = await P002Api.getCourse(courseId);
-      // Store current course data
-      window._currentCourse = { course, sections };
-      // Render module detail screen using DB data
-      renderCourseDetail(course, sections);
-      showScreen('moduleScreen');
+      await P002Api.generateRequest('delete_course', { course_id: courseId });
+      showToast('Course deleted', false);
+      loadMyCourses();
     } catch(e) {
-      showToast('Error loading course: ' + e.message, false);
+      showToast('Error: ' + e.message, false);
     }
   }
 
+  
   function renderCourseDetail(course, sections) {
     document.getElementById('moduleDetailCategory').textContent = (course.category || '') + (course.difficulty ? ' · ' + course.difficulty : '');
     document.getElementById('moduleDetailTitle').textContent = course.title;
@@ -1763,6 +1726,8 @@ window.P002App = (() => {
     logout,
     switchTab,
     loadMyCourses,
+    confirmDeleteCourse,
+    deleteCourse,
     openCourse,
     editCourse,
     renderCourseDetail,
