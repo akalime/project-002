@@ -461,8 +461,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <div class="home-title">What are you<br><span>learning today?</span></div>
     <div class="home-actions">
       <button class="home-action-btn primary" onclick="P002App.openLibrary()">&#128218; Browse Library</button>
+      <button class="home-action-btn" onclick="P002App.triggerUpload()">&#128196; Upload</button>
     </div>
   </div>
+  <input type="file" id="uploadInput" accept=".pdf,.txt,.docx" style="display:none">
   <div id="moduleGrid">
     <div class="skeleton-card"><div class="skeleton-line" style="height:10px;width:35%;"></div><div class="skeleton-line" style="height:16px;width:65%;margin-top:8px;"></div><div class="skeleton-line" style="height:10px;width:45%;"></div></div>
     <div class="skeleton-card" style="margin-top:8px;"><div class="skeleton-line" style="height:10px;width:35%;"></div><div class="skeleton-line" style="height:16px;width:55%;margin-top:8px;"></div><div class="skeleton-line" style="height:10px;width:45%;"></div></div>
@@ -735,6 +737,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   <div id="startBtn" style="display:none"></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
 <script src="/project-002/security.js"></script>
 <script src="/project-002/api.js"></script>
 <script src="/project-002/fetch.js"></script>

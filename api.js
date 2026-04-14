@@ -206,6 +206,92 @@ var P002Api = (() => {
     });
   }
 
+  // Regenerate an existing course via SSE — wipes sections, reruns pipeline using stored source text
+  // onProgress(pct, sectionTitle, done) called after each section
+  // onOutline(courseId, outline) called when outline is ready
+  function regenerateCourse(courseId, onProgress, onOutline = null) {
+    return new Promise((resolve, reject) => {
+      const session = getSession();
+      session.then(sess => {
+        if (!sess) return reject(new Error('Not authenticated'));
+
+        const body = JSON.stringify({
+          action: 'regenerate_course',
+          course_id: courseId,
+        });
+
+        fetch(GENERATE_PROXY, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sess.access_token}`,
+            'apikey': SUPABASE_ANON_KEY,
+          },
+          body,
+        }).then(response => {
+          if (!response.ok) {
+            response.json().then(d => reject(new Error(d.error || 'Regeneration failed')));
+            return;
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let sourceId = null;
+          let outline = null;
+
+          function processBuffer() {
+            const lines = buffer.split(/\r?\n/);
+            buffer = lines.pop();
+
+            let eventName = '';
+            let dataStr = '';
+
+            for (const line of lines) {
+              if (line.startsWith('event: ')) {
+                eventName = line.slice(7).trim();
+              } else if (line.startsWith('data: ')) {
+                dataStr = line.slice(6).trim();
+              } else if (line === '' && eventName && dataStr) {
+                try {
+                  const data = JSON.parse(dataStr);
+                  if (eventName === 'outline') {
+                    sourceId = data.source_id;
+                    outline  = data.outline;
+                    if (onOutline) onOutline(courseId, outline);
+                  } else if (eventName === 'section_done') {
+                    if (onProgress) onProgress(data.pct, data.title, data.done);
+                  } else if (eventName === 'complete') {
+                    resolve({ course_id: courseId, source_id: sourceId, outline });
+                  } else if (eventName === 'error') {
+                    reject(new Error(data.message));
+                  }
+                } catch(e) {}
+                eventName = '';
+                dataStr = '';
+              }
+            }
+          }
+
+          function read() {
+            reader.read().then(({ done, value }) => {
+              if (done) {
+                if (outline) resolve({ course_id: courseId, source_id: sourceId, outline });
+                else reject(new Error('Stream ended unexpectedly'));
+                return;
+              }
+              buffer += decoder.decode(value, { stream: true });
+              processBuffer();
+              read();
+            }).catch(reject);
+          }
+
+          read();
+        }).catch(reject);
+      }).catch(reject);
+    });
+  }
+
   // Full generation via SSE — server-side loop, user can navigate freely
   // onProgress(pct, sectionTitle, done) called after each section
   // onOutline(courseId, outline) called when outline is ready
@@ -322,7 +408,7 @@ var P002Api = (() => {
     adminRequest, adminGetSessions, adminGetSessionMessages, adminGetUsers,
     adminGetStats, adminRunSql, adminDeleteSession, adminBanUser,
     generateRequest,
-    getCourse, getMyCourses, saveProgress, generateCourse,
+    getCourse, getMyCourses, saveProgress, generateCourse, regenerateCourse,
   };
 
 })();

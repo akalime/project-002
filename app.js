@@ -54,6 +54,9 @@ window.P002App = (() => {
       showScreen('authScreen');
       setStatus(false, 'offline');
     }
+    document.getElementById('uploadInput')?.addEventListener('change', e => {
+      handleUploadFile(e.target.files[0]);
+    });
     document.getElementById('loadingOverlay').style.opacity = '0';
     setTimeout(() => document.getElementById('loadingOverlay').style.display = 'none', 400);
   }
@@ -184,6 +187,7 @@ window.P002App = (() => {
         '<div style="font-size:11px;color:var(--text-dim);margin-bottom:20px;">' + (course.section_count || 0) + ' sections · ' + (course.category || '') + '</div>' +
         '<div style="display:flex;flex-direction:column;gap:8px;">' +
           '<button id="courseOptOpen" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--text);cursor:pointer;text-align:left;">&#128214; Open course</button>' +
+          '<button id="courseOptRegenerate" style="background:rgba(255,159,67,0.08);border:1px solid rgba(255,159,67,0.2);border-radius:12px;padding:14px;font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--accent2);cursor:pointer;text-align:left;">&#9850; Regenerate course</button>' +
           '<button id="courseOptDelete" style="background:rgba(255,77,77,0.08);border:1px solid rgba(255,77,77,0.2);border-radius:12px;padding:14px;font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--accent);cursor:pointer;text-align:left;">&#128465; Delete course</button>' +
           '<button id="courseOptCancel" style="background:transparent;border:1px solid var(--border);border-radius:12px;padding:14px;font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--text-muted);cursor:pointer;">Cancel</button>' +
         '</div>' +
@@ -193,10 +197,31 @@ window.P002App = (() => {
     document.getElementById('courseOptOpen').addEventListener('click', () => { modal.remove(); openCourse(course.id); });
     document.getElementById('courseOptCancel').addEventListener('click', () => modal.remove());
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    document.getElementById('courseOptRegenerate').addEventListener('click', () => {
+      modal.remove();
+      startRegenerate(course);
+    });
     document.getElementById('courseOptDelete').addEventListener('click', () => {
       modal.remove();
       confirmDeleteCourse(course.id, course.title);
     });
+  }
+
+  function startRegenerate(course) {
+    const shortTitle = course.title.length > 25 ? course.title.slice(0, 25) + '...' : course.title;
+    showToast('&#9850; Regenerating "' + shortTitle + '" — you can keep browsing!', true);
+    P002Api.regenerateCourse(
+      course.id,
+      (pct, sectionTitle, done) => {
+        if (done) {
+          showToast('&#9989; "' + shortTitle + '" regenerated!', true);
+          if (document.getElementById('homeScreen').classList.contains('active')) loadMyCourses();
+        }
+      },
+      (courseId, outline) => {
+        if (document.getElementById('homeScreen').classList.contains('active')) loadMyCourses();
+      }
+    ).catch(e => showToast('Regeneration failed: ' + e.message, false));
   }
 
   async function confirmDeleteCourse(courseId, title) {
@@ -1698,6 +1723,86 @@ window.P002App = (() => {
   }
 
 
+  // ==================== UPLOAD ====================
+  function triggerUpload() {
+    const input = document.getElementById('uploadInput');
+    if (input) { input.value = ''; input.click(); }
+  }
+
+  async function handleUploadFile(file) {
+    if (!file) return;
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['pdf', 'txt', 'docx'].includes(ext)) {
+      showToast('Unsupported file type. Use PDF, TXT, or DOCX.', false);
+      return;
+    }
+
+    let rawText = '';
+    try {
+      if (ext === 'txt') {
+        rawText = await file.text();
+      } else if (ext === 'pdf') {
+        if (!window.pdfjsLib) throw new Error('PDF library not loaded');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const parts = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          parts.push(content.items.map(item => item.str).join(' '));
+        }
+        rawText = parts.join('\n');
+      } else if (ext === 'docx') {
+        if (!window.mammoth) throw new Error('DOCX library not loaded');
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        rawText = result.value;
+      }
+    } catch(e) {
+      showToast('Could not read file: ' + e.message, false);
+      return;
+    }
+
+    if (!rawText || rawText.trim().length < 100) {
+      showToast('File has too little text to generate a course.', false);
+      return;
+    }
+
+    const baseName = file.name.replace(/\.[^.]+$/, '');
+    const prefs = await showImportPrompt(file.name);
+    if (!prefs) return;
+
+    const prefContext = '\n\n=== COURSE CUSTOMIZATION ===\n' +
+      (prefs.focus   ? 'Focus on: '     + prefs.focus   + '\n' : '') +
+      (prefs.level   ? 'Target level: ' + prefs.level   + '\n' : '') +
+      (prefs.purpose ? 'Purpose: '      + prefs.purpose + '\n' : '') +
+      (prefs.include ? 'Must include: ' + prefs.include + '\n' : '') +
+      'Number of sections: ' + (prefs.sections || 8) + '\n' +
+      'Creativity level: '  + (prefs.creativity || 5) + '/10\n';
+
+    rawText = rawText + prefContext;
+
+    showToast('&#128196; Generating "' + baseName.slice(0, 25) + (baseName.length > 25 ? '...' : '') + '" — you can keep browsing!', true);
+
+    P002Api.generateCourse(
+      baseName,
+      null,
+      'upload',
+      null,
+      rawText,
+      (pct, sectionTitle, done) => {
+        if (done) {
+          showToast('&#9989; "' + baseName.slice(0, 25) + (baseName.length > 25 ? '...' : '') + '" is ready!', true);
+          if (document.getElementById('homeScreen').classList.contains('active')) loadMyCourses();
+        }
+      },
+      prefs.temperature || 0.7,
+      (courseId, outline) => { loadMyCourses(); }
+    ).catch(e => showToast('Failed: ' + e.message, false));
+  }
+
   function libraryReset() {
     clearInterval(libDotInterval);
     document.getElementById('libIdle').style.display = 'flex';
@@ -1806,6 +1911,9 @@ window.P002App = (() => {
     importBook,
     showImportPrompt,
     libraryReset,
+    // Upload
+    triggerUpload,
+    handleUploadFile,
   };
 
 })();
