@@ -357,9 +357,70 @@ window.P002Fetch = (() => {
   async function searchNASA(query)  { throw new Error('NASA not yet implemented'); }
   async function searchArxiv(query) { throw new Error('arXiv not yet implemented'); }
 
+  // ==================== SOURCE PARSER ====================
+  // Parses source text into natural sections based on headings
+  // Wikipedia uses == Heading == format
+  // Returns array of { title, text } chunks
+
+  function parseSourceSections(text, source) {
+    if (!text) return [];
+
+    // Wikipedia heading pattern: == Heading == or === Sub ===
+    const wikiHeadingRe = /^={2,3}([^=]+)={2,3}\s*$/gm;
+
+    // Skip these sections — boilerplate, not educational
+    const skipSections = new Set([
+      'see also', 'references', 'external links', 'further reading',
+      'notes', 'bibliography', 'footnotes', 'citations', 'sources',
+      'gallery', 'awards', 'discography', 'filmography', 'selected works',
+    ]);
+
+    const sections = [];
+    const matches = [...text.matchAll(wikiHeadingRe)];
+
+    if (matches.length < 2) {
+      // No clear heading structure — return as single chunk
+      return [{ title: 'Introduction', text: text.slice(0, 8000) }];
+    }
+
+    // Add intro section (text before first heading)
+    const introText = text.slice(0, matches[0].index).trim();
+    if (introText.length > 100) {
+      sections.push({ title: 'Introduction', text: introText });
+    }
+
+    // Add each headed section
+    matches.forEach((match, i) => {
+      const title = match[1].trim();
+      if (skipSections.has(title.toLowerCase())) return;
+
+      const start = match.index + match[0].length;
+      const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
+      const sectionText = text.slice(start, end).trim();
+
+      if (sectionText.length > 80) {
+        sections.push({ title, text: sectionText });
+      }
+    });
+
+    return sections;
+  }
+
+  // Fetch Wikipedia article with section structure
+  async function fetchWikipediaWithSections(title) {
+    const text = await fetchWikipediaText(title);
+    return {
+      text,
+      sections: parseSourceSections(text, 'Wikipedia'),
+    };
+  }
+
+
   return {
     searchLibrary,
     fetchBookText,
+    parseSourceSections,
+    fetchWikipediaWithSections,
     searchNASA,
     searchArxiv,
     _fetchWikipedia:  fetchWikipedia,
