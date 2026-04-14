@@ -1766,6 +1766,14 @@ window.P002App = (() => {
       return;
     }
 
+    // PDFs (and some DOCX) leave NUL bytes and invalid control chars from embedded
+    // fonts/ligatures. Postgres TEXT columns reject \u0000 with "unsupported Unicode
+    // escape sequence" when the row is inserted server-side, so strip them here.
+    // Keep \t (\u0009), \n (\u000A), \r (\u000D) — everything else in C0 goes.
+    rawText = rawText
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+      .replace(/\uFFFD/g, '');
+
     if (!rawText || rawText.trim().length < 100) {
       showToast('File has too little text to generate a course.', false);
       return;
