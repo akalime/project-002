@@ -1592,9 +1592,7 @@ window.P002App = (() => {
                 '<span style="font-size:10px;color:var(--text-dim);width:12px;">4</span>' +
                 '<input id="importSections" type="range" min="4" max="20" value="8" ' +
                   'style="flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--accent) 25%,var(--border) 25%);outline:none;cursor:pointer;" ' +
-                  'oninput="document.getElementById('importSectionCount').textContent=this.value;' +
-                    'const pct=((this.value-4)/16)*100;' +
-                    'this.style.background='linear-gradient(90deg,var(--accent) '+pct+'%,var(--border) '+pct+'%)'" />' +
+                  'oninput="var el=document.getElementById(\'importSectionCount\');if(el)el.textContent=this.value;var p=((this.value-4)/16)*100;this.style.background=\'linear-gradient(90deg,var(--accent) \'+p+\'%,var(--border) \'+p+\'%)\'" />' +
                 '<span style="font-size:10px;color:var(--text-dim);width:16px;">20</span>' +
               '</div>' +
               '<div style="display:flex;justify-content:space-between;padding:4px 24px 0;">' +
