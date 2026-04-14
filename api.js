@@ -191,12 +191,13 @@ const P002Api = (() => {
   }
 
   // Generate one section — call in a loop
-  async function generateSection(courseId, sectionIndex, outline, rawText) {
+  async function generateSection(courseId, sectionIndex, outline, rawText, temperature = 0.7) {
     return generateRequest('section', {
       course_id:     courseId,
       section_index: sectionIndex,
       outline,
       raw_text:      rawText,
+      temperature,
     });
   }
 
@@ -227,13 +228,13 @@ const P002Api = (() => {
 
   // Full generation loop — init + all sections
   // onProgress(pct, sectionTitle, done) called after each section
-  async function generateCourse(title, author, sourceType, sourceUrl, rawText, onProgress) {
+  async function generateCourse(title, author, sourceType, sourceUrl, rawText, onProgress, temperature = 0.7) {
     const { course_id, source_id, outline } = await generateInit(
       title, author, sourceType, sourceUrl, rawText
     );
     const total = outline.sections.length;
     for (let i = 0; i < total; i++) {
-      const result = await generateSection(course_id, i, outline, rawText);
+      const result = await generateSection(course_id, i, outline, rawText, temperature);
       const pct = Math.round(((i + 1) / total) * 100);
       if (onProgress) onProgress(pct, result.title, result.done);
       if (result.done) break;
