@@ -62,9 +62,9 @@ window.P002App = (() => {
     setStatus(true, currentUser.email.split('@')[0]);
     document.getElementById('logoutBtn').style.display = 'block';
     document.getElementById('settingsBtn').style.display = 'block';
-    if (P002Api.isAdmin(currentUser)) {
-      document.getElementById('adminBtn').style.display = 'block';
-    }
+    P002Api.isAdmin().then(admin => {
+      if (admin) document.getElementById('adminBtn').style.display = 'block';
+    });
     showScreen('homeScreen');
     loadMyCourses();
   }
