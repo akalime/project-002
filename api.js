@@ -4,7 +4,7 @@
 // Handles all Supabase and Edge Function communication
 // ================================================================
 
-const P002Api = (() => {
+var P002Api = (() => {
 
   // ==================== CONFIG ====================
   const SUPABASE_URL = 'https://obobtgryhcrptcyaukvw.supabase.co';
@@ -246,7 +246,7 @@ const P002Api = (() => {
           let outline = null;
 
           function processBuffer() {
-          const lines = buffer.split('\n');
+            const lines = buffer.split(/\r?\n/);
             buffer = lines.pop(); // keep incomplete line
 
             let eventName = '';
@@ -321,8 +321,8 @@ const P002Api = (() => {
     callClaude, signPrompt,
     adminRequest, adminGetSessions, adminGetSessionMessages, adminGetUsers,
     adminGetStats, adminRunSql, adminDeleteSession, adminBanUser,
-    generateRequest, generateInit, generateFromUpload, generateSection,
-getCourse, getMyCourses, saveProgress, generateCourse,
+    generateRequest,
+    getCourse, getMyCourses, saveProgress, generateCourse,
   };
 
 })();
