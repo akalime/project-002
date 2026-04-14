@@ -52,22 +52,50 @@ var P002Api = (() => {
   }
 
   async function isAdmin() {
-    // Admin check handled server-side by admin-proxy
-    // Never expose admin UID client-side
+    // Admin check handled server-side by admin-proxy.
+    // Never expose admin UID client-side — we infer by whether admin-proxy
+    // accepts a privileged call from this user.
     try {
-      const data = await adminRequest('get_stats');
-      return !!data.total_sessions !== undefined;
+      await adminRequest('get_stats');
+      return true;
     } catch(e) {
       return false;
     }
   }
 
   // ==================== STORAGE ====================
-  // Storage kept only for raw uploaded source files
+  // Raw uploaded source files live in the BUCKET. These helpers wrap the
+  // supabase storage client so admin.js doesn't have to poke at getClient()
+  // directly. Server-side RLS / bucket policies still enforce admin-only.
   async function deleteFile(path) {
     const { error } = await getClient().storage
       .from(BUCKET)
       .remove([path]);
+    if (error) throw error;
+    return true;
+  }
+
+  async function listBucket(folder = '') {
+    const { data, error } = await getClient().storage
+      .from(BUCKET)
+      .list(folder, { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function adminGetFile(path) {
+    const { data, error } = await getClient().storage
+      .from(BUCKET)
+      .download(path);
+    if (error) throw error;
+    return await data.text();
+  }
+
+  async function adminSaveFile(path, content) {
+    const blob = new Blob([content], { type: 'application/json' });
+    const { error } = await getClient().storage
+      .from(BUCKET)
+      .upload(path, blob, { upsert: true, contentType: 'application/json' });
     if (error) throw error;
     return true;
   }
@@ -239,19 +267,22 @@ var P002Api = (() => {
           let buffer = '';
           let sourceId = null;
           let outline = null;
+          // Hoisted across processBuffer() calls so events split across network
+          // chunks aren't dropped when the trailing blank-line delimiter arrives
+          // in a later chunk.
+          let eventName = '';
+          let dataStr = '';
 
           function processBuffer() {
             const lines = buffer.split(/\r?\n/);
             buffer = lines.pop();
 
-            let eventName = '';
-            let dataStr = '';
-
             for (const line of lines) {
               if (line.startsWith('event: ')) {
                 eventName = line.slice(7).trim();
               } else if (line.startsWith('data: ')) {
-                dataStr = line.slice(6).trim();
+                // SSE allows multiple data: lines per event — concatenate with \n
+                dataStr = dataStr ? dataStr + '\n' + line.slice(6) : line.slice(6);
               } else if (line === '' && eventName && dataStr) {
                 try {
                   const data = JSON.parse(dataStr);
@@ -276,6 +307,8 @@ var P002Api = (() => {
           function read() {
             reader.read().then(({ done, value }) => {
               if (done) {
+                // Flush any trailing event that wasn't terminated by a blank line
+                if (buffer) { buffer += '\n'; processBuffer(); }
                 if (outline) resolve({ course_id: courseId, source_id: sourceId, outline });
                 else reject(new Error('Stream ended unexpectedly'));
                 return;
@@ -330,19 +363,22 @@ var P002Api = (() => {
           let courseId = null;
           let sourceId = null;
           let outline = null;
+          // Hoisted across processBuffer() calls so events split across network
+          // chunks aren't dropped when the trailing blank-line delimiter arrives
+          // in a later chunk.
+          let eventName = '';
+          let dataStr = '';
 
           function processBuffer() {
             const lines = buffer.split(/\r?\n/);
             buffer = lines.pop(); // keep incomplete line
 
-            let eventName = '';
-            let dataStr = '';
-
             for (const line of lines) {
               if (line.startsWith('event: ')) {
                 eventName = line.slice(7).trim();
               } else if (line.startsWith('data: ')) {
-                dataStr = line.slice(6).trim();
+                // SSE allows multiple data: lines per event — concatenate with \n
+                dataStr = dataStr ? dataStr + '\n' + line.slice(6) : line.slice(6);
               } else if (line === '' && eventName && dataStr) {
                 try {
                   const data = JSON.parse(dataStr);
@@ -368,6 +404,8 @@ var P002Api = (() => {
           function read() {
             reader.read().then(({ done, value }) => {
               if (done) {
+                // Flush any trailing event that wasn't terminated by a blank line
+                if (buffer) { buffer += '\n'; processBuffer(); }
                 if (courseId) resolve({ course_id: courseId, source_id: sourceId, outline });
                 else reject(new Error('Stream ended unexpectedly'));
                 return;
@@ -385,24 +423,20 @@ var P002Api = (() => {
   }
 
   // ==================== PROMPT SIGNING ====================
-  const PROMPT_SECRET = 'REPLACE_WITH_YOUR_PROMPT_SECRET';
-
-  async function signPrompt(prompt) {
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode(PROMPT_SECRET);
-    const msgData = encoder.encode(prompt);
-    const key = await crypto.subtle.importKey(
-      'raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-    );
-    const sig = await crypto.subtle.sign('HMAC', key, msgData);
-    return btoa(String.fromCharCode(...new Uint8Array(sig)));
-  }
+  // Removed: a client-side HMAC secret is inherently public. Any "signature"
+  // produced with a client-shipped key can be forged by anyone who loads this
+  // JS bundle, so it provides no authentication. Transport integrity is
+  // already provided by HTTPS, and prompt authorization is enforced
+  // server-side via the session JWT. If prompt-level auth is needed later,
+  // do it by hashing+allowlisting on the server, never by signing on the
+  // client.
+  async function signPrompt(_prompt) { return null; }
 
   // ==================== PUBLIC API ====================
   return {
     SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET,
     getClient, getSession, getUser, signIn, signUp, signOut, isAdmin,
-    deleteFile,
+    deleteFile, listBucket, adminGetFile, adminSaveFile,
     createSession, getSessionMessages, saveMessage, completeSession, captureFlag,
     callClaude, signPrompt,
     adminRequest, adminGetSessions, adminGetSessionMessages, adminGetUsers,

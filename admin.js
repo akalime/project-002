@@ -35,7 +35,7 @@ window.P002Admin = (() => {
   async function init() {
     try {
       const session = await P002Api.getSession();
-      if (session && P002Api.isAdmin(session.user)) {
+      if (session && await P002Api.isAdmin()) {
         currentUser = session.user;
         showApp();
       }
@@ -59,7 +59,7 @@ window.P002Admin = (() => {
     btn.disabled = true; btn.textContent = 'Authenticating...';
     try {
       const user = await P002Api.signIn(email, password);
-      if (!P002Api.isAdmin(user)) throw new Error('Not authorized as admin');
+      if (!(await P002Api.isAdmin())) throw new Error('Not authorized as admin');
       currentUser = user;
       showApp();
     } catch(e) {
@@ -1328,7 +1328,10 @@ STRICT RULES — you MUST follow these:
         const el = document.createElement('div');
         el.className = 'user-row';
         const initial = (u.email || '?').charAt(0).toUpperCase();
-        const isAdmin = u.id === P002Api.ADMIN_USER_ID;
+        // Mark the currently-logged-in admin so we don't offer a Ban button
+        // against themselves. ADMIN_USER_ID was removed from the client API
+        // deliberately — there is no list of admin UIDs exposed to the browser.
+        const isAdmin = currentUser && u.id === currentUser.id;
         el.innerHTML =
           '<div class="user-avatar">' + initial + '</div>' +
           '<div class="user-info">' +

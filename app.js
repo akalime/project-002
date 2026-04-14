@@ -1194,9 +1194,10 @@ window.P002App = (() => {
     document.getElementById('sendBtn').disabled = true;
     showTyping();
     try {
-      const sig = await P002Api.signPrompt(systemPrompt);
+      // Client-side prompt signing was removed — see api.js. Server enforces
+      // auth via the session JWT on the Claude proxy.
       const trimmed = messages.slice(-20);
-      const reply = await P002Api.callClaude(systemPrompt, trimmed, sig);
+      const reply = await P002Api.callClaude(systemPrompt, trimmed);
       removeTyping();
       chatHistory.push({ role: 'assistant', content: reply });
       addMessage('assistant', reply);
