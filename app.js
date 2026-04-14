@@ -1475,10 +1475,18 @@ window.P002App = (() => {
     try {
       // Fetch source text
       let rawText = '';
+      let parsedSections = null;
+
       if (book.source === 'Wikipedia') {
-        rawText = await P002Fetch.fetchBookText(book);
+        const result = await P002Fetch.fetchWikipediaWithSections(book.title);
+        rawText = result.text;
+        parsedSections = result.sections;
+        if (parsedSections && parsedSections.length > 1) {
+          rawText = parsedSections.map(s => '== ' + s.title + ' ==\n' + s.text).join('\n\n');
+        }
       } else if (book.source === 'Gutenberg' && book.textUrl) {
         rawText = await P002Fetch.fetchBookText(book);
+        parsedSections = P002Fetch.parseSourceSections(rawText, 'Gutenberg');
       } else if (book.textUrl) {
         rawText = 'Source: ' + book.textUrl + '\n\nTitle: ' + book.title + '\nAuthor: ' + book.author + '\n\n' + (book.description || '');
       } else {
@@ -1487,13 +1495,21 @@ window.P002App = (() => {
 
       if (!rawText || rawText.length < 100) throw new Error('Not enough content to generate a course');
 
+      // Use natural section count unless user requested more
+      if (parsedSections && parsedSections.length > 1) {
+        const naturalCount = parsedSections.length;
+        const requestedCount = prefs.sections || 8;
+        prefs.sections = requestedCount > naturalCount ? requestedCount : naturalCount;
+      }
+
       // Append user preferences to raw text so generation prompt picks them up
       const prefContext = '\n\n=== COURSE CUSTOMIZATION ===\n' +
         (prefs.focus    ? 'Focus on: ' + prefs.focus + '\n' : '') +
         (prefs.level    ? 'Target level: ' + prefs.level + '\n' : '') +
         (prefs.purpose  ? 'Purpose: ' + prefs.purpose + '\n' : '') +
         (prefs.include  ? 'Must include: ' + prefs.include + '\n' : '') +
-        'Number of sections: ' + (prefs.sections || 8) + '\n';
+        'Number of sections: ' + (prefs.sections || 8) + '\n' +
+        'Creativity level: ' + (prefs.creativity || 5) + '/10\n';
 
       rawText = rawText + prefContext;
 
@@ -1512,7 +1528,8 @@ window.P002App = (() => {
             btn.classList.add('imported');
             btn.innerHTML = '&#10003; Added';
           }
-        }
+        },
+        prefs.temperature || 0.7
       );
 
       showToast('&#128218; ' + book.title.slice(0, 30) + (book.title.length > 30 ? '...' : '') + ' — course ready!', true);
@@ -1528,7 +1545,6 @@ window.P002App = (() => {
   // Import customization prompt modal
   function showImportPrompt(bookTitle) {
     return new Promise((resolve) => {
-      // Remove existing modal if any
       const existing = document.getElementById('importPromptModal');
       if (existing) existing.remove();
 
@@ -1537,18 +1553,15 @@ window.P002App = (() => {
       modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;display:flex;align-items:flex-end;backdrop-filter:blur(4px);';
 
       modal.innerHTML =
-        '<div style="background:#111013;border-radius:20px 20px 0 0;border:1px solid rgba(255,255,255,0.08);width:100%;padding:0 0 32px;max-height:85vh;overflow-y:auto;">' +
-          // Handle
+        '<div style="background:#111013;border-radius:20px 20px 0 0;border:1px solid rgba(255,255,255,0.08);width:100%;padding:0 0 32px;max-height:90vh;overflow-y:auto;">' +
           '<div style="padding:10px 0;display:flex;justify-content:center;">' +
             '<div style="width:36px;height:3px;background:rgba(255,255,255,0.1);border-radius:2px;"></div>' +
           '</div>' +
-          // Header
           '<div style="padding:8px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.06);">' +
             '<div style="font-family:var(--font-display);font-size:17px;font-weight:800;color:var(--text);letter-spacing:-0.5px;margin-bottom:3px;">Customize your course</div>' +
             '<div style="font-size:11px;color:var(--text-dim);">' + P002Security.escapeHtml(bookTitle) + '</div>' +
           '</div>' +
-          // Fields
-          '<div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px;">' +
+          '<div style="padding:18px 20px;display:flex;flex-direction:column;gap:16px;">' +
 
             // Focus
             '<div>' +
@@ -1585,25 +1598,41 @@ window.P002App = (() => {
                 'style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-family:var(--font-body);font-size:14px;color:var(--text);outline:none;box-sizing:border-box;" />' +
             '</div>' +
 
-            // Sections
+            // Depth slider
             '<div>' +
-              '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;">Sections <span id="importSectionCount" style="color:var(--accent);font-weight:800;font-family:var(--font-mono);">8</span></div>' +
-              '<div style="display:flex;align-items:center;gap:12px;">' +
-                '<span style="font-size:10px;color:var(--text-dim);width:12px;">4</span>' +
-                '<input id="importSections" type="range" min="4" max="20" value="8" ' +
-                  'style="flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--accent) 25%,var(--border) 25%);outline:none;cursor:pointer;" ' +
-                  'oninput="var el=document.getElementById(\'importSectionCount\');if(el)el.textContent=this.value;var p=((this.value-4)/16)*100;this.style.background=\'linear-gradient(90deg,var(--accent) \'+p+\'%,var(--border) \'+p+\'%)\'" />' +
-                '<span style="font-size:10px;color:var(--text-dim);width:16px;">20</span>' +
+              '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;">' +
+                'Depth &nbsp;<span id="importDepthVal" style="color:var(--accent);font-weight:800;font-family:var(--font-mono);">8</span> sections' +
               '</div>' +
-              '<div style="display:flex;justify-content:space-between;padding:4px 24px 0;">' +
-                '<span style="font-size:9px;color:var(--text-dim);">Quick overview</span>' +
+              '<input id="importDepth" type="range" min="4" max="20" value="8" ' +
+                'style="width:100%;accent-color:var(--accent);cursor:pointer;" />' +
+              '<div style="display:flex;justify-content:space-between;margin-top:3px;">' +
+                '<span style="font-size:9px;color:var(--text-dim);">Overview</span>' +
                 '<span style="font-size:9px;color:var(--text-dim);">Standard</span>' +
-                '<span style="font-size:9px;color:var(--text-dim);">Comprehensive</span>' +
+                '<span style="font-size:9px;color:var(--text-dim);">Deep dive</span>' +
               '</div>' +
             '</div>' +
 
+            // Creativity slider
+            '<div>' +
+              '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;">' +
+                'Creativity &nbsp;<span id="importCreativityLabel" style="color:var(--accent2);font-weight:800;font-family:var(--font-mono);">Balanced</span>' +
+              '</div>' +
+              '<input id="importCreativity" type="range" min="1" max="10" value="5" ' +
+                'style="width:100%;accent-color:var(--accent2);cursor:pointer;" />' +
+              '<div style="display:flex;justify-content:space-between;margin-top:3px;">' +
+                '<span style="font-size:9px;color:var(--text-dim);">Source only</span>' +
+                '<span style="font-size:9px;color:var(--text-dim);">Balanced</span>' +
+                '<span style="font-size:9px;color:var(--text-dim);">Claude expands</span>' +
+              '</div>' +
+            '</div>' +
+
+            // Keep tab open warning
+            '<div style="background:rgba(255,159,67,0.08);border:1px solid rgba(255,159,67,0.2);border-radius:10px;padding:10px 14px;display:flex;gap:8px;align-items:flex-start;">' +
+              '<span style="font-size:13px;flex-shrink:0;">&#9888;</span>' +
+              '<span style="font-size:11px;color:var(--accent2);line-height:1.5;">Keep this tab open while your course generates. Leaving will stop generation.</span>' +
+            '</div>' +
+
           '</div>' +
-          // Actions
           '<div style="padding:0 20px;display:flex;gap:10px;">' +
             '<button id="importCancel" style="flex:1;background:transparent;border:1px solid var(--border);border-radius:12px;padding:14px;font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--text-muted);cursor:pointer;">Cancel</button>' +
             '<button id="importConfirm" style="flex:2;background:var(--accent);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:15px;font-weight:800;color:#fff;cursor:pointer;">Build Course &#8594;</button>' +
@@ -1612,7 +1641,7 @@ window.P002App = (() => {
 
       document.body.appendChild(modal);
 
-      // Level button toggle
+      // Level toggle
       let selectedLevel = 'beginner';
       modal.querySelectorAll('.import-level-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1626,34 +1655,45 @@ window.P002App = (() => {
         });
       });
 
-      // Focus input auto-focus
+      // Depth slider
+      const depthSlider = document.getElementById('importDepth');
+      const depthVal = document.getElementById('importDepthVal');
+      depthSlider.addEventListener('input', () => {
+        depthVal.textContent = depthSlider.value;
+      });
+
+      // Creativity slider
+      const creativitySlider = document.getElementById('importCreativity');
+      const creativityLabel = document.getElementById('importCreativityLabel');
+      const creativityLabels = { 1:'Strict', 2:'Strict', 3:'Conservative', 4:'Conservative', 5:'Balanced', 6:'Balanced', 7:'Creative', 8:'Creative', 9:'Expansive', 10:'Expansive' };
+      creativitySlider.addEventListener('input', () => {
+        creativityLabel.textContent = creativityLabels[parseInt(creativitySlider.value)] || 'Balanced';
+      });
+
+      // Auto-focus
       setTimeout(() => document.getElementById('importFocus')?.focus(), 100);
 
       // Cancel
-      document.getElementById('importCancel').addEventListener('click', () => {
-        modal.remove();
-        resolve(null);
-      });
-
-      // Backdrop tap = cancel
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) { modal.remove(); resolve(null); }
-      });
+      document.getElementById('importCancel').addEventListener('click', () => { modal.remove(); resolve(null); });
+      modal.addEventListener('click', e => { if (e.target === modal) { modal.remove(); resolve(null); } });
 
       // Confirm
       document.getElementById('importConfirm').addEventListener('click', () => {
+        const creativity = parseInt(document.getElementById('importCreativity')?.value || '5');
         const prefs = {
-          focus:    document.getElementById('importFocus')?.value?.trim() || '',
-          level:    selectedLevel,
-          purpose:  document.getElementById('importPurpose')?.value?.trim() || '',
-          include:  document.getElementById('importInclude')?.value?.trim() || '',
-          sections: parseInt(document.getElementById('importSections')?.value || '8'),
+          focus:       document.getElementById('importFocus')?.value?.trim() || '',
+          level:       selectedLevel,
+          purpose:     document.getElementById('importPurpose')?.value?.trim() || '',
+          include:     document.getElementById('importInclude')?.value?.trim() || '',
+          sections:    parseInt(document.getElementById('importDepth')?.value || '8'),
+          creativity:  creativity,
+          temperature: parseFloat((0.2 + (creativity - 1) * (0.9 / 9)).toFixed(2)), // maps 1-10 to 0.2-1.0
         };
         modal.remove();
         resolve(prefs);
       });
 
-      // Enter key on any input = confirm
+      // Enter = confirm
       ['importFocus', 'importPurpose', 'importInclude'].forEach(id => {
         document.getElementById(id)?.addEventListener('keydown', e => {
           if (e.key === 'Enter') document.getElementById('importConfirm')?.click();
@@ -1661,6 +1701,7 @@ window.P002App = (() => {
       });
     });
   }
+
 
   function libraryReset() {
     clearInterval(libDotInterval);
