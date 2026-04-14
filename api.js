@@ -9,7 +9,6 @@ const P002Api = (() => {
   // ==================== CONFIG ====================
   const SUPABASE_URL = 'https://obobtgryhcrptcyaukvw.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ib2J0Z3J5aGNycHRjeWF1a3Z3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3MTUxMzQsImV4cCI6MjA5MTI5MTEzNH0.o3Rq3VqTN6uWzX4Uqfqd8VpH2wlS5PmoDvtRQOMc9EU';
-  const ADMIN_USER_ID = '33a3fc69-5fad-4344-ba69-c1a4381be3d5';
   const CLAUDE_PROXY    = `${SUPABASE_URL}/functions/v1/claude-proxy`;
   const ADMIN_PROXY     = `${SUPABASE_URL}/functions/v1/admin-proxy`;
   const GENERATE_PROXY  = `${SUPABASE_URL}/functions/v1/generate`;
@@ -52,8 +51,15 @@ const P002Api = (() => {
     await getClient().auth.signOut();
   }
 
-  function isAdmin(user) {
-    return user?.id === ADMIN_USER_ID;
+  async function isAdmin() {
+    // Admin check handled server-side by admin-proxy
+    // Never expose admin UID client-side
+    try {
+      const data = await adminRequest('get_stats');
+      return !!data.total_sessions !== undefined;
+    } catch(e) {
+      return false;
+    }
   }
 
   // ==================== STORAGE ====================
@@ -258,7 +264,7 @@ const P002Api = (() => {
 
   // ==================== PUBLIC API ====================
   return {
-    SUPABASE_URL, SUPABASE_ANON_KEY, ADMIN_USER_ID, BUCKET,
+    SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET,
     getClient, getSession, getUser, signIn, signUp, signOut, isAdmin,
     deleteFile,
     createSession, getSessionMessages, saveMessage, completeSession, captureFlag,
