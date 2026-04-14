@@ -179,38 +179,12 @@ const P002Api = (() => {
   }
 
   // Init from raw text (library import)
-  async function generateInit(title, author, sourceType, sourceUrl, rawText) {
-    return generateRequest('init', {
-      title, author,
-      source_type: sourceType,
-      source_url:  sourceUrl,
-      raw_text:    rawText,
-    });
-  }
 
   // Init from uploaded file in Storage
-  async function generateFromUpload(filePath, title) {
-    return generateRequest('from_upload', {
-      file_path: filePath,
-      title,
-    });
-  }
 
   // Generate one section — call in a loop
-  async function generateSection(courseId, sectionIndex, outline, rawText, temperature = 0.7) {
-    return generateRequest('section', {
-      course_id:     courseId,
-      section_index: sectionIndex,
-      outline,
-      raw_text:      rawText,
-      temperature,
-    });
-  }
 
   // Poll generation status
-  async function generateStatus(courseId) {
-    return generateRequest('status', { course_id: courseId });
-  }
 
   // Get full course + sections for reading
   async function getCourse(courseId) {
@@ -232,20 +206,97 @@ const P002Api = (() => {
     });
   }
 
-  // Full generation loop — init + all sections
+  // Full generation via SSE — server-side loop, user can navigate freely
   // onProgress(pct, sectionTitle, done) called after each section
-  async function generateCourse(title, author, sourceType, sourceUrl, rawText, onProgress, temperature = 0.7) {
-    const { course_id, source_id, outline } = await generateInit(
-      title, author, sourceType, sourceUrl, rawText
-    );
-    const total = outline.sections.length;
-    for (let i = 0; i < total; i++) {
-      const result = await generateSection(course_id, i, outline, rawText, temperature);
-      const pct = Math.round(((i + 1) / total) * 100);
-      if (onProgress) onProgress(pct, result.title, result.done);
-      if (result.done) break;
-    }
-    return { course_id, source_id, outline };
+  // onOutline(courseId, outline) called when outline is ready
+  function generateCourse(title, author, sourceType, sourceUrl, rawText, onProgress, temperature = 0.7, onOutline = null) {
+    return new Promise((resolve, reject) => {
+      const session = getSession();
+      session.then(sess => {
+        if (!sess) return reject(new Error('Not authenticated'));
+
+        const body = JSON.stringify({
+          action:      'generate_stream',
+          title, author,
+          source_type: sourceType,
+          source_url:  sourceUrl,
+          raw_text:    rawText,
+          temperature,
+        });
+
+        fetch(GENERATE_PROXY, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sess.access_token}`,
+            'apikey': SUPABASE_ANON_KEY,
+          },
+          body,
+        }).then(response => {
+          if (!response.ok) {
+            response.json().then(d => reject(new Error(d.error || 'Generation failed')));
+            return;
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let courseId = null;
+          let sourceId = null;
+          let outline = null;
+
+          function processBuffer() {
+            const lines = buffer.split('
+');
+            buffer = lines.pop(); // keep incomplete line
+
+            let eventName = '';
+            let dataStr = '';
+
+            for (const line of lines) {
+              if (line.startsWith('event: ')) {
+                eventName = line.slice(7).trim();
+              } else if (line.startsWith('data: ')) {
+                dataStr = line.slice(6).trim();
+              } else if (line === '' && eventName && dataStr) {
+                try {
+                  const data = JSON.parse(dataStr);
+                  if (eventName === 'outline') {
+                    courseId = data.course_id;
+                    sourceId = data.source_id;
+                    outline  = data.outline;
+                    if (onOutline) onOutline(courseId, outline);
+                  } else if (eventName === 'section_done') {
+                    if (onProgress) onProgress(data.pct, data.title, data.done);
+                  } else if (eventName === 'complete') {
+                    resolve({ course_id: courseId, source_id: sourceId, outline });
+                  } else if (eventName === 'error') {
+                    reject(new Error(data.message));
+                  }
+                } catch(e) {}
+                eventName = '';
+                dataStr = '';
+              }
+            }
+          }
+
+          function read() {
+            reader.read().then(({ done, value }) => {
+              if (done) {
+                if (courseId) resolve({ course_id: courseId, source_id: sourceId, outline });
+                else reject(new Error('Stream ended unexpectedly'));
+                return;
+              }
+              buffer += decoder.decode(value, { stream: true });
+              processBuffer();
+              read();
+            }).catch(reject);
+          }
+
+          read();
+        }).catch(reject);
+      }).catch(reject);
+    });
   }
 
   // ==================== PROMPT SIGNING ====================
@@ -272,7 +323,7 @@ const P002Api = (() => {
     adminRequest, adminGetSessions, adminGetSessionMessages, adminGetUsers,
     adminGetStats, adminRunSql, adminDeleteSession, adminBanUser,
     generateRequest, generateInit, generateFromUpload, generateSection,
-    generateStatus, getCourse, getMyCourses, saveProgress, generateCourse,
+getCourse, getMyCourses, saveProgress, generateCourse,
   };
 
 })();
