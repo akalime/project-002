@@ -246,8 +246,7 @@ const P002Api = (() => {
           let outline = null;
 
           function processBuffer() {
-            const lines = buffer.split('
-');
+          const lines = buffer.split('\n');
             buffer = lines.pop(); // keep incomplete line
 
             let eventName = '';
