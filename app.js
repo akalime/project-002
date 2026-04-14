@@ -137,27 +137,28 @@ window.P002App = (() => {
     card.addEventListener('mouseenter', () => { card.style.borderColor = 'var(--border2)'; card.style.transform = 'translateX(2px)'; });
     card.addEventListener('mouseleave', () => { card.style.borderColor = 'var(--border)'; card.style.transform = ''; });
 
-    if (course.status === 'ready') {
-      // Long press = edit, tap = open
-      let pressTimer = null;
-      let didLongPress = false;
+    // Long press on any card = options (delete etc)
+    // Tap on ready card = open
+    let pressTimer = null;
+    let didLongPress = false;
 
-      card.addEventListener('mousedown', () => {
-        didLongPress = false;
-        pressTimer = setTimeout(() => {
-          didLongPress = true;
-          showCourseOptions(course);
-        }, 600);
-      });
-      card.addEventListener('touchstart', () => {
-        didLongPress = false;
-        pressTimer = setTimeout(() => {
-          didLongPress = true;
-          showCourseOptions(course);
-        }, 600);
-      }, { passive: true });
-      card.addEventListener('mouseup', () => clearTimeout(pressTimer));
-      card.addEventListener('touchend', () => clearTimeout(pressTimer));
+    card.addEventListener('mousedown', () => {
+      didLongPress = false;
+      pressTimer = setTimeout(() => {
+        didLongPress = true;
+        showCourseOptions(course);
+      }, 600);
+    });
+    card.addEventListener('touchstart', () => {
+      didLongPress = false;
+      pressTimer = setTimeout(() => {
+        didLongPress = true;
+        showCourseOptions(course);
+      }, 600);
+    }, { passive: true });
+    card.addEventListener('mouseup', () => clearTimeout(pressTimer));
+    card.addEventListener('touchend', () => clearTimeout(pressTimer));
+    if (course.status === 'ready') {
       card.addEventListener('click', () => { if (!didLongPress) openCourse(course.id); });
     }
     return card;
